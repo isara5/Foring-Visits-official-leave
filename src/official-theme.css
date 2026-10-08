@@ -1,0 +1,422 @@
+:root {
+  --ink: #182d4d;
+  --muted: #68768a;
+  --line: #e0e7f0;
+  --paper: #fff;
+  --green: #155eef;
+  --green-dark: #0c48c5;
+  background: #f5f7fb;
+}
+
+body,
+.main-area {
+  background: #f5f7fb;
+}
+
+.sidebar {
+  background: #fff;
+  color: #26364d;
+  border-right: 1px solid #e4eaf2;
+}
+
+.crest-lockup {
+  margin: 0 -6px 25px;
+  padding: 9px 8px;
+  align-items: center;
+  gap: 9px;
+  background: #fff;
+  border-radius: 6px;
+}
+
+.ministry-emblem {
+  display: block;
+  width: 41px;
+  height: 58px;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+.crest-lockup > div:last-child {
+  padding-left: 2px;
+}
+
+.crest-lockup strong {
+  color: #182d4d;
+  font-size: 9px;
+  letter-spacing: 0;
+}
+
+.crest-lockup div:last-child span {
+  color: #738198;
+  font-size: 8px;
+  letter-spacing: 0.7px;
+}
+
+.nav-caption {
+  color: #8b98ab;
+}
+
+.nav-item {
+  color: #596981;
+}
+
+.nav-item:hover,
+.nav-item.active {
+  background: #edf3ff;
+  color: #1552d1;
+}
+
+.nav-item.active .nav-icon,
+.nav-icon {
+  color: #72839c;
+}
+
+.nav-item.active .nav-icon {
+  color: #155eef;
+}
+
+.nav-item.active:before {
+  background: #155eef;
+}
+
+.nav-count {
+  background: #e9efff;
+  color: #1552d1;
+}
+
+.support-line {
+  border-color: #e4eaf2;
+  color: #697991;
+}
+
+.profile-copy span,
+.profile-block button {
+  color: #718098;
+}
+
+.topbar {
+  background: #fff;
+  border-color: #e4eaf2;
+}
+
+.crumb,
+.today-label {
+  color: #7b8798;
+}
+
+.crumb strong {
+  color: #354760;
+}
+
+.crumb-slash {
+  color: #c2cad5;
+}
+
+.page-heading h1,
+.table-heading h2 {
+  color: #1c3151;
+}
+
+.primary-button,
+.login-submit {
+  background: #155eef;
+  border-color: #155eef;
+  border-radius: 6px;
+}
+
+.primary-button:hover,
+.login-submit:hover {
+  background: #0c48c5;
+}
+
+.role-pill {
+  border-color: #dbe6fb;
+  color: #315dba;
+  background: #f5f8ff;
+  border-radius: 16px;
+}
+
+.ref-cell,
+.tab.selected {
+  color: #1552d1;
+}
+
+.tab.selected:after {
+  background: #155eef;
+}
+
+.login-art {
+  background-color: #12253c;
+  background-image: linear-gradient(180deg, rgb(11 28 49 / 52%), rgb(10 25 44 / 77%)), url('https://mode.gov.lk/assets/HeroImage-D_qLwhFY.jpg');
+  background-position: center;
+  background-size: cover;
+}
+
+.art-content h1 em {
+  color: #b9d0ff;
+}
+
+.art-overline,
+.art-content p {
+  color: #e0e8f5;
+}
+
+.art-rule {
+  background: #8fb2ff;
+}
+
+.art-lines {
+  display: none;
+}
+
+.art-nav .mini-crest,
+.login-emblem .crest.large {
+  width: 46px;
+  height: 64px;
+  border: 0;
+  border-radius: 5px;
+  clip-path: none;
+  background: #fff url('https://mode.gov.lk/assets/logo-C1c0CvCU.png') center / 82% 90% no-repeat;
+  color: transparent;
+  font-size: 0;
+}
+
+.login-emblem .crest.large span {
+  font-size: 0;
+}
+
+.login-panel {
+  background: #f5f7fb;
+}
+
+.login-description {
+  color: #68768a;
+}
+
+.metric,
+.table-section {
+  border-radius: 6px;
+}
+
+.lang-button,
+.filter-button,
+.field-label input,
+.field-label select,
+.field-label textarea,
+.login-card .field-label input,
+.login-card .field-label select {
+  border-radius: 6px;
+}
+
+.detailed-request-modal {
+  width: min(850px, 100%);
+  max-height: 94vh;
+}
+
+.detailed-request-modal > .modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff;
+}
+
+.detailed-form-body {
+  padding: 0 25px;
+}
+
+.form-section {
+  padding: 20px 0 18px;
+  border-bottom: 1px solid #e7ebf1;
+}
+
+.form-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 15px;
+}
+
+.form-number {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #edf3ff;
+  color: #1552d1;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.form-section-heading h3 {
+  margin: 0 0 3px;
+  color: #1c3151;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.form-section-heading p {
+  margin: 0;
+  color: #8190a4;
+  font-size: 9px;
+}
+
+.form-section .form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px;
+}
+
+.read-only-field {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid #e0e7f0;
+  border-radius: 6px;
+  background: #f5f7fb;
+  color: #68768a;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.check-field,
+.declaration-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #55657c;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+.check-field input,
+.declaration-field input {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 1px 0 0;
+  accent-color: #155eef;
+}
+
+.declaration-field {
+  margin: 17px 0;
+  padding: 12px;
+  border: 1px solid #dce6f8;
+  border-radius: 6px;
+  background: #f5f8ff;
+  color: #263d63;
+  font-weight: 600;
+}
+
+.detailed-signature {
+  padding-bottom: 3px;
+}
+
+.detailed-request-modal .modal-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: #fff;
+}
+
+.request-review-details {
+  border-top: 1px solid #e7ebf1;
+  margin-top: 2px;
+}
+
+.review-detail-group {
+  padding: 14px 0;
+  border-bottom: 1px solid #e7ebf1;
+}
+
+.review-detail-group h3 {
+  margin: 0 0 10px;
+  color: #27436d;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.review-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 18px;
+}
+
+.review-detail-grid > div {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.review-detail-grid .review-wide {
+  grid-column: 1 / -1;
+}
+
+.review-detail-grid span {
+  color: #8995a7;
+  font-size: 8px;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.review-detail-grid strong {
+  color: #354760;
+  font-size: 10px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.review-declaration {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-top: 12px;
+  color: #347247;
+  font-size: 9px;
+}
+
+@media (max-width: 760px) {
+  .crest-lockup {
+    margin: 0 0 31px;
+    padding: 0 5px;
+    background: transparent;
+  }
+
+  .crest-lockup .ministry-emblem {
+    width: 37px;
+    height: 53px;
+  }
+
+  .crest-lockup > div:last-child {
+    display: none;
+  }
+
+  .art-nav .mini-crest {
+    width: 40px;
+    height: 56px;
+  }
+
+  .detailed-form-body {
+    padding: 0 16px;
+  }
+
+  .form-section .form-grid,
+  .review-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .detailed-request-modal {
+    max-height: 96vh;
+  }
+
+  .detailed-request-modal .modal-footer {
+    margin-left: -17px;
+    margin-right: -17px;
+    padding-left: 17px;
+    padding-right: 17px;
+  }
+}
