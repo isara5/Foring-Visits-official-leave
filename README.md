@@ -1,6 +1,6 @@
 # Foreign Visits & Official Leave Portal
 
-A local demo portal for Sri Lankan public-sector foreign travel and official leave requests. The UI supports Sinhala and English, role-selected sign-in, approval routing, and signature drawing.
+A secure local portal for Sri Lankan public-sector foreign travel and official leave authorization (Appendix 16 & General 126). The UI supports Sinhala and English, applicant self-registration, role-free authentication, reviewer verification, and executive authority approval routing.
 
 ## Run locally
 
@@ -9,21 +9,32 @@ npm install
 npm run dev
 ```
 
-Open the URL printed by Vite (normally http://localhost:5173). The Express API runs at http://localhost:3001 and stores data in `data/portal.sqlite`.
+- Frontend: [http://localhost:5173](http://localhost:5173)
+- Express API: [http://localhost:3001](http://localhost:3001)
+- Database: `data/portal.sqlite`
 
-## Demo accounts
+## User Roles & Workflow
 
-Choose the matching role on the sign-in form. Demo password for seeded accounts: `Demo@123`.
+1. **Applicant**: Fills and signs foreign travel & leave request (General 126 + Appendix 16).
+2. **Reviewer**: Inspects submitted particulars, supporting documents, funding, and covering officers. Routes to the appropriate authority (*Authorized Official*, *Minister*, or *President's Office*), or returns for amendments / rejects.
+3. **Approving Authority**:
+   - **Authorized Official** (Department Head / Ministry Secretary)
+   - **Hon. Minister** (Cabinet Minister)
+   - **Presidential Secretariat** (Presidential Office)
+   Grants final approval, returns for amendments, or rejects.
+4. **Administrator**: Full portal control, user account provisioning, review approvals, and master audit reports.
 
-| Role | Email |
-| --- | --- |
-| Administrator | admin@foring.gov.lk |
-| Applicant | officer@foring.gov.lk |
-| Supervisor | supervisor@foring.gov.lk |
-| HR Officer | hr@foring.gov.lk |
-| Finance Officer | finance@foring.gov.lk |
-| Director | director@foring.gov.lk |
+## Demo Accounts
 
-Administrator password: `Admin@123`.
+Sign in directly with your email and password (no role selection needed):
 
-These are development credentials only. Do not deploy this demo as-is or reuse these passwords in production.
+| Role | Email | Password |
+| --- | --- | --- |
+| **Administrator** | `admin@foring.gov.lk` | `Admin@123` |
+| **Applicant** | `officer@foring.gov.lk` | `Demo@123` |
+| **Reviewer** | `reviewer@foring.gov.lk` | `Demo@123` |
+| **Authorized Official** | `authorized@foring.gov.lk` | `Demo@123` |
+| **Minister** | `minister@foring.gov.lk` | `Demo@123` |
+| **President's Secretariat** | `president@foring.gov.lk` | `Demo@123` |
+
+*Note: New applicants can self-register using the **Applicant Registration** tab on the sign-in page. All other administrative, reviewer, and executive authority accounts are provisioned by the Administrator.*
