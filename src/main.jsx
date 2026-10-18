@@ -37,6 +37,7 @@ import {
   UserCheck,
   UserPlus,
   Users,
+  FolderArchive,
   X
 } from 'lucide-react';
 import SignaturePad from './signature-pad.jsx';
@@ -46,11 +47,20 @@ import DetailedRequestModal, {
   OfficerAssessmentSection,
   SecretariatMinuteTrailSection,
   printSubjectOfficerPdf,
+  printSubjectOfficerNoteSheetPdf,
   printGeneral126Pdf,
   printOfficeUseOnlyPdf,
   printDepartmentHeadLetterPdf,
+  printSecretaryApprovalLetterPdf,
   printNoteSheetMinisterialPdf,
-  PresidentialOrderSection
+  PresidentialOrderSection,
+  WorkflowHierarchyStepper,
+  ApplicantLiveProcessTracker,
+  getHierarchyStatusInfo,
+  DeleteConfirmModal,
+  RejectRequestModal,
+  downloadApplicationZip,
+  ApplicationZipPackageCard
 } from './request-modal.jsx';
 import './styles.css';
 import './official-theme.css';
@@ -374,6 +384,10 @@ function App() {
   const [selected, setSelected] = useState(null);
   const [query, setQuery] = useState('');
   const [toast, setToast] = useState('');
+  const [applicantTrackId, setApplicantTrackId] = useState(null);
+  const [editingRequest, setEditingRequest] = useState(null);
+  const [deletingRequest, setDeletingRequest] = useState(null);
+  const [rejectingRequest, setRejectingRequest] = useState(null);
 
   // Approvals view filters
   const [approvalStageFilter, setApprovalStageFilter] = useState('all');
@@ -881,9 +895,12 @@ function App() {
                   <p style="margin: 2px 0 0; text-decoration: underline;">${d.departmentHeadEndorsement.ministryName} அமைச்சு</p>
                   <p style="margin: 8px 0 0;">The Secretary,</p>
                   <p style="margin: 2px 0 0; text-decoration: underline;">Ministry of ${d.departmentHeadEndorsement.ministryName}</p>
-                  <div style="margin-top: 8px;">
+                  <div style="margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap;">
                     <button class="no-print" onclick="window.opener && window.opener.printDepartmentHeadLetterPdf ? window.opener.printDepartmentHeadLetterPdf(${JSON.stringify(r).replace(/"/g, '&quot;')}) : (window.printDepartmentHeadLetterPdf ? window.printDepartmentHeadLetterPdf(${JSON.stringify(r).replace(/"/g, '&quot;')}) : window.print())" style="font-size: 9.5px; background: #faf5ff; color: #7e22ce; border: 1px solid #d8b4fe; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-weight: 600;">
                       📄 ආයතන ප්‍රධානී ලිපිය වෙනම PDF
+                    </button>
+                    <button class="no-print" onclick="window.opener && window.opener.printSecretaryApprovalLetterPdf ? window.opener.printSecretaryApprovalLetterPdf(${JSON.stringify(r).replace(/"/g, '&quot;')}) : (window.printSecretaryApprovalLetterPdf ? window.printSecretaryApprovalLetterPdf(${JSON.stringify(r).replace(/"/g, '&quot;')}) : window.print())" style="font-size: 9.5px; background: #f0fdf4; color: #15803d; border: 1px solid #86efac; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-weight: 600;">
+                      📄 ලේකම් ලිපිය වෙනම PDF
                     </button>
                   </div>
                 </div>
@@ -954,6 +971,59 @@ function App() {
                   <div style="margin-top: 4px; font-size: 9.5px;">දෙපාර්තමේන්තු ප්‍රධානියාගේ අත්සන සහ නිල නාමය</div>
                   <div style="color: #475569; font-size: 8.5px;">திணைக்களத் தலைவரின் கையொப்பமும் பதவிய்ப்பෙயரும்</div>
                   <div style="font-size: 9px; font-style: italic;">Signature and Designation of Head of Department</div>
+                </div>
+              </div>
+
+              <!-- PART 2: MINISTRY SECRETARY APPROVAL & DIRECTIVE TO HEAD OF DEPARTMENT (Est. Code XV 10:1 - Image 2) -->
+              <div style="margin-top: 36px; border-top: 2px dashed #0f172a; padding-top: 24px;">
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 20px; font-size: 11px;">
+                  <div>
+                    my no.} <span style="display: inline-block; border-bottom: 1px dotted #000; min-width: 150px; padding: 0 4px; font-weight: bold;">
+                      ${secretaryClearance?.myNo || (r.status === 'Approved' ? `MCS/SEC/${new Date().getFullYear()}/FV-${String(r.id).padStart(4, '0')}` : '...........................')}
+                    </span>
+                  </div>
+                </div>
+
+                <div style="text-align: left; margin-bottom: 24px; font-size: 11px; line-height: 1.5;">
+                  <span style="display: inline-block; border-bottom: 1px dotted #000; min-width: 240px;">
+                    ${d.departmentHeadEndorsement?.completedBy?.name || '......................................................................'}
+                  </span><br />
+                  Head of Department.
+                </div>
+
+                <div style="text-align: center; margin: 26px 0 32px; font-size: 13px;">
+                  <div style="border-bottom: 1px dotted #000; width: 250px; margin: 0 auto 6px;"></div>
+                  <div>
+                    ${
+                      r.status === 'Approved' || secretaryClearance?.decision === 'approve'
+                        ? 'Leave is <strong style="text-decoration: underline; color: #16a34a;">approved</strong> / <span style="text-decoration: line-through; color: #94a3b8;">not approved</span>'
+                        : r.status === 'Rejected' || secretaryClearance?.decision === 'reject'
+                        ? 'Leave is <span style="text-decoration: line-through; color: #94a3b8;">approved</span> / <strong style="text-decoration: underline; color: #dc2626;">not approved</strong>'
+                        : 'Leave is approved/not approved'
+                    }
+                  </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 28px;">
+                  <div style="font-size: 11px;">
+                    <div>
+                      Date} <span style="display: inline-block; border-bottom: 1px dotted #000; min-width: 120px; padding: 0 4px;">
+                        ${secretaryClearance?.date || (r.status === 'Approved' ? r.updated_at?.slice(0, 10) : '...........................')}
+                      </span>
+                    </div>
+                    <div style="margin-top: 14px; font-size: 10px; color: #475569; font-style: italic;">
+                      copy to: Secretary to the Prime Minister.
+                    </div>
+                  </div>
+
+                  <div style="text-align: center; font-size: 10.5px; line-height: 1.35;">
+                    ${secretaryClearance?.signature ? `<img src="${secretaryClearance.signature}" style="max-height: 44px; display: block; margin: 0 auto 4px;" alt="Secretary Signature" />` : '<div style="height: 32px; border-bottom: 1px dotted #000; width: 170px; margin: 0 auto 4px;"></div>'}
+                    <div style="border-top: 1px dotted #000; padding-top: 4px;">
+                      ${secretaryClearance?.userName ? `<strong style="display: block; font-size: 10px;">${secretaryClearance.userName}</strong>` : (r.status === 'Approved' ? '<strong style="display: block; font-size: 10px;">වරුෂණ ශ්‍රී ධනපාල</strong>' : '')}
+                      <strong>Secretary.</strong><br />
+                      ministry of <span style="border-bottom: 1px dotted #000; padding: 0 4px; font-weight: bold;">${secretaryClearance?.ministryName || d.departmentHeadEndorsement?.ministryName || '...............................'}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1190,6 +1260,10 @@ function App() {
   const isSecretariat = ['assistant_secretary', 'senior_assistant_secretary', 'additional_secretary', 'secretary'].includes(user.role);
   const isAuthority = ['authorized_official', 'minister', 'president'].includes(user.role);
   const canReviewOrApprove = isAdmin || isDeptHead || isReviewer || isSecretariat || isAuthority;
+
+  const activeApplicantRequest = isApplicant
+    ? (requests.find((r) => r.id === applicantTrackId) || requests[0] || null)
+    : null;
 
   // Counts
   const pendingRequests = requests.filter((r) => r.status.startsWith('Pending'));
@@ -1532,6 +1606,24 @@ function App() {
                 </article>
               </div>
 
+              {/* Applicant Live Process Status Tracker */}
+              {isApplicant && (
+                <ApplicantLiveProcessTracker
+                  request={activeApplicantRequest}
+                  language={language}
+                  onOpenDetail={handleOpenRequest}
+                  allRequests={requests}
+                  selectedRequestId={applicantTrackId}
+                  onSelectRequestId={setApplicantTrackId}
+                  onNewRequest={() => setShowLeaveTypeModal(true)}
+                  onEditRequest={(req) => setEditingRequest(req)}
+                  onDeleteRequest={(req) => setDeletingRequest(req)}
+                  onRejectRequest={(req) => setRejectingRequest(req)}
+                  user={user}
+                  token={token}
+                />
+              )}
+
               {/* Multi-Stage Approval Pipeline Flow Visualizer */}
               <div className="pipeline-card">
                 <div className="pipeline-header">
@@ -1685,15 +1777,109 @@ function App() {
                             <span className="type-tag">{request.leave_type}</span>
                           </td>
                           <td>
-                            <span className={`status-badge ${getStatusBadgeClass(request.status)}`}>
-                              <i />
-                              {t.statuses[request.status] || request.status}
-                            </span>
+                            {(() => {
+                              const sInfo = getHierarchyStatusInfo(request, language);
+                              return (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <span className={`status-badge ${getStatusBadgeClass(request.status)}`} style={{ alignSelf: 'flex-start' }}>
+                                    <i />
+                                    {t.statuses[request.status] || request.status}
+                                  </span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{
+                                      fontSize: '9.5px',
+                                      fontWeight: 700,
+                                      color: sInfo.color,
+                                      background: sInfo.bg,
+                                      border: `1px solid ${sInfo.border}`,
+                                      padding: '1px 5px',
+                                      borderRadius: '4px',
+                                      whiteSpace: 'nowrap'
+                                    }}>
+                                      {language === 'si' ? `පියවර ${sInfo.step}/9` : `Step ${sInfo.step}/9`}
+                                    </span>
+                                    <div style={{
+                                      flex: 1,
+                                      height: '4px',
+                                      background: '#e2e8f0',
+                                      borderRadius: '2px',
+                                      overflow: 'hidden',
+                                      minWidth: '38px',
+                                      maxWidth: '60px'
+                                    }}>
+                                      <div style={{
+                                        width: `${sInfo.percent}%`,
+                                        height: '100%',
+                                        background: sInfo.color,
+                                        borderRadius: '2px'
+                                      }} />
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td>
-                            <button className="row-arrow" aria-label={t.detail}>
-                              <ArrowRight size={16} />
-                            </button>
+                            {(() => {
+                              const userRole = user.role;
+                              const isAdmin = userRole === 'admin';
+                              const isOwner = user.id === request.applicant_id || userRole === 'applicant';
+                              const isEditableStatus = ['Pending Department Head Approval', 'Pending Review', 'Returned'].includes(request.status);
+                              const canEditRow = isAdmin || (isOwner && isEditableStatus);
+                              const canDeleteRow = isAdmin || (isOwner && isEditableStatus);
+                              const canRejectRow = !['Approved', 'Rejected'].includes(request.status) &&
+                                ['department_head', 'reviewer', 'assistant_secretary', 'senior_assistant_secretary', 'additional_secretary', 'secretary', 'authorized_official', 'minister', 'president', 'admin'].includes(userRole);
+
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
+                                  {canEditRow && (
+                                    <button
+                                      type="button"
+                                      className="icon-button"
+                                      onClick={(e) => { e.stopPropagation(); setEditingRequest(request); }}
+                                      title={language === 'si' ? 'අයදුම්පත සංස්කරණය කරන්න' : 'Edit Application'}
+                                      style={{ color: '#2563eb', padding: '4px' }}
+                                    >
+                                      <Edit3 size={14} />
+                                    </button>
+                                  )}
+                                  {canDeleteRow && (
+                                    <button
+                                      type="button"
+                                      className="icon-button"
+                                      onClick={(e) => { e.stopPropagation(); setDeletingRequest(request); }}
+                                      title={language === 'si' ? 'අයදුම්පත මකා දමන්න' : 'Delete Application'}
+                                      style={{ color: '#dc2626', padding: '4px' }}
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  )}
+                                  {canRejectRow && (
+                                    <button
+                                      type="button"
+                                      className="secondary-button"
+                                      onClick={(e) => { e.stopPropagation(); setRejectingRequest(request); }}
+                                      title={language === 'si' ? 'අයදුම්පත ප්‍රතික්ෂේප කරන්න' : 'Reject Application'}
+                                      style={{ height: '24px', padding: '0 8px', fontSize: '9.5px', color: '#b91c1c', borderColor: '#fca5a5', background: '#fee2e2', fontWeight: 700 }}
+                                    >
+                                      {language === 'si' ? 'ප්‍රතික්ෂේප' : 'Reject'}
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    className="icon-button"
+                                    onClick={(e) => { e.stopPropagation(); downloadApplicationZip(request, token); }}
+                                    title={language === 'si' ? `සම්පූර්ණ ZIP ගොනුව බාගන්න (FV-${String(request.id).padStart(4, '0')}.zip)` : `Download Complete ZIP Package (FV-${String(request.id).padStart(4, '0')}.zip)`}
+                                    style={{ color: '#1d4ed8', padding: '4px' }}
+                                  >
+                                    <FolderArchive size={14} />
+                                  </button>
+                                  <button className="row-arrow" aria-label={t.detail} onClick={() => handleOpenRequest(request)}>
+                                    <ArrowRight size={16} />
+                                  </button>
+                                </div>
+                              );
+                            })()}
                           </td>
                         </tr>
                       ))}
@@ -1739,6 +1925,24 @@ function App() {
                   )}
                 </div>
               </div>
+
+              {/* Applicant Live Process Status Tracker */}
+              {isApplicant && (
+                <ApplicantLiveProcessTracker
+                  request={activeApplicantRequest}
+                  language={language}
+                  onOpenDetail={handleOpenRequest}
+                  allRequests={requests}
+                  selectedRequestId={applicantTrackId}
+                  onSelectRequestId={setApplicantTrackId}
+                  onNewRequest={() => setShowLeaveTypeModal(true)}
+                  onEditRequest={(req) => setEditingRequest(req)}
+                  onDeleteRequest={(req) => setDeletingRequest(req)}
+                  onRejectRequest={(req) => setRejectingRequest(req)}
+                  user={user}
+                  token={token}
+                />
+              )}
 
               <section className="table-section">
                 <div className="table-heading">
@@ -1883,20 +2087,118 @@ function App() {
                             <span className="type-tag">{request.leave_type}</span>
                           </td>
                           <td onClick={() => handleOpenRequest(request)}>
-                            <span className={`status-badge ${getStatusBadgeClass(request.status)}`}>
-                              <i />
-                              {t.statuses[request.status] || request.status}
-                            </span>
+                            {(() => {
+                              const sInfo = getHierarchyStatusInfo(request, language);
+                              return (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <span className={`status-badge ${getStatusBadgeClass(request.status)}`} style={{ alignSelf: 'flex-start' }}>
+                                    <i />
+                                    {t.statuses[request.status] || request.status}
+                                  </span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{
+                                      fontSize: '9.5px',
+                                      fontWeight: 700,
+                                      color: sInfo.color,
+                                      background: sInfo.bg,
+                                      border: `1px solid ${sInfo.border}`,
+                                      padding: '1px 5px',
+                                      borderRadius: '4px',
+                                      whiteSpace: 'nowrap'
+                                    }}>
+                                      {language === 'si' ? `පියවර ${sInfo.step}/9` : `Step ${sInfo.step}/9`}
+                                    </span>
+                                    <div style={{
+                                      flex: 1,
+                                      height: '4px',
+                                      background: '#e2e8f0',
+                                      borderRadius: '2px',
+                                      overflow: 'hidden',
+                                      minWidth: '38px',
+                                      maxWidth: '60px'
+                                    }}>
+                                      <div style={{
+                                        width: `${sInfo.percent}%`,
+                                        height: '100%',
+                                        background: sInfo.color,
+                                        borderRadius: '2px'
+                                      }} />
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td style={{ textAlign: 'right' }}>
-                            <button
-                              className="primary-button"
-                              style={{ height: '30px', padding: '0 12px', fontSize: '10px' }}
-                              onClick={() => handleOpenRequest(request)}
-                            >
-                              <CheckSquare size={13} />
-                              {t.reviewAndDecide}
-                            </button>
+                            {(() => {
+                              const userRole = user.role;
+                              const isAdmin = userRole === 'admin';
+                              const isOwner = user.id === request.applicant_id || userRole === 'applicant';
+                              const isEditableStatus = ['Pending Department Head Approval', 'Pending Review', 'Returned'].includes(request.status);
+                              const canEditRow = isAdmin || (isOwner && isEditableStatus);
+                              const canDeleteRow = isAdmin || (isOwner && isEditableStatus);
+                              const canRejectRow = !['Approved', 'Rejected'].includes(request.status) &&
+                                ['department_head', 'reviewer', 'assistant_secretary', 'senior_assistant_secretary', 'additional_secretary', 'secretary', 'authorized_official', 'minister', 'president', 'admin'].includes(userRole);
+
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
+                                  {canEditRow && (
+                                    <button
+                                      type="button"
+                                      className="secondary-button"
+                                      onClick={(e) => { e.stopPropagation(); setEditingRequest(request); }}
+                                      title={language === 'si' ? 'අයදුම්පත සංස්කරණය කරන්න' : 'Edit Application'}
+                                      style={{ height: '30px', padding: '0 8px', fontSize: '10px', color: '#1d4ed8', borderColor: '#bfdbfe', background: '#eff6ff' }}
+                                    >
+                                      <Edit3 size={13} />
+                                      <span>{language === 'si' ? 'සංස්කරණය' : 'Edit'}</span>
+                                    </button>
+                                  )}
+                                  {canDeleteRow && (
+                                    <button
+                                      type="button"
+                                      className="secondary-button"
+                                      onClick={(e) => { e.stopPropagation(); setDeletingRequest(request); }}
+                                      title={language === 'si' ? 'අයදුම්පත මකා දමන්න' : 'Delete Application'}
+                                      style={{ height: '30px', padding: '0 8px', fontSize: '10px', color: '#dc2626', borderColor: '#fca5a5', background: '#fef2f2' }}
+                                    >
+                                      <Trash2 size={13} />
+                                      <span>{language === 'si' ? 'මකා දමන්න' : 'Delete'}</span>
+                                    </button>
+                                  )}
+                                  {canRejectRow && (
+                                    <button
+                                      type="button"
+                                      className="secondary-button"
+                                      onClick={(e) => { e.stopPropagation(); setRejectingRequest(request); }}
+                                      title={language === 'si' ? 'අයදුම්පත ප්‍රතික්ෂේප කරන්න' : 'Reject Application'}
+                                      style={{ height: '30px', padding: '0 8px', fontSize: '10px', color: '#b91c1c', borderColor: '#fca5a5', background: '#fee2e2', fontWeight: 700 }}
+                                    >
+                                      <AlertCircle size={13} />
+                                      <span>{language === 'si' ? 'ප්‍රතික්ෂේප' : 'Reject'}</span>
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    className="secondary-button"
+                                    onClick={(e) => { e.stopPropagation(); downloadApplicationZip(request, token); }}
+                                    title={language === 'si' ? `සම්පූර්ණ ZIP ගොනුව බාගන්න (FV-${String(request.id).padStart(4, '0')}.zip)` : `Download Complete ZIP Package (FV-${String(request.id).padStart(4, '0')}.zip)`}
+                                    style={{ height: '30px', padding: '0 8px', fontSize: '10px', color: '#1e40af', borderColor: '#93c5fd', background: '#eff6ff', fontWeight: 700 }}
+                                  >
+                                    <FolderArchive size={13} />
+                                    <span>ZIP</span>
+                                  </button>
+                                  <button
+                                    className="primary-button"
+                                    style={{ height: '30px', padding: '0 12px', fontSize: '10px' }}
+                                    onClick={() => handleOpenRequest(request)}
+                                  >
+                                    <CheckSquare size={13} />
+                                    {t.reviewAndDecide}
+                                  </button>
+                                </div>
+                              );
+                            })()}
                           </td>
                         </tr>
                       ))}
@@ -2418,7 +2720,10 @@ function App() {
           onSubmitted={() => {
             setShowNew(false);
             loadRequests();
-            setToast(t.requestCreated);
+            setApplicantTrackId(null);
+            setToast(language === 'si'
+              ? 'අයදුම්පත සාර්ථකව ඉදිරිපත් කරන ලදී! වත්මන් තත්ත්වය: පියවර 2/9 (ආයතන ප්‍රධානී අනුමැතිය අපේක්ෂාවෙන්)'
+              : 'Application submitted successfully! Current Status: Step 2 of 9 (Pending Department Head Approval)');
           }}
         />
       )}
@@ -2437,6 +2742,73 @@ function App() {
             setSelected(null);
             loadRequests();
             setToast(t.decisionSaved);
+          }}
+          onEdit={(req) => {
+            setSelected(null);
+            setEditingRequest(req);
+          }}
+          onDelete={(req) => {
+            setDeletingRequest(req);
+          }}
+          onReject={(req) => {
+            setRejectingRequest(req);
+          }}
+        />
+      )}
+
+      {/* 3. EDIT APPLICATION MODAL */}
+      {editingRequest && (
+        <DetailedRequestModal
+          t={t}
+          language={language}
+          user={user}
+          token={token}
+          editingRequest={editingRequest}
+          onClose={() => setEditingRequest(null)}
+          onSubmitted={() => {
+            setEditingRequest(null);
+            loadRequests();
+            setToast(language === 'si'
+              ? 'අයදුම්පත සාර්ථකව සංස්කරණය කරන ලදී (Application updated successfully)!'
+              : 'Application updated successfully!');
+          }}
+        />
+      )}
+
+      {/* 4. DELETE CONFIRMATION MODAL */}
+      {deletingRequest && (
+        <DeleteConfirmModal
+          request={deletingRequest}
+          language={language}
+          token={token}
+          onClose={() => setDeletingRequest(null)}
+          onDeleted={(req) => {
+            setDeletingRequest(null);
+            if (selected?.id === req.id) setSelected(null);
+            if (applicantTrackId === req.id) setApplicantTrackId(null);
+            loadRequests();
+            setToast(language === 'si'
+              ? 'අයදුම්පත සාර්ථකව මකා දමන ලදී (Application deleted)!'
+              : 'Application deleted successfully!');
+          }}
+        />
+      )}
+
+      {/* 5. REJECT APPLICATION MODAL */}
+      {rejectingRequest && (
+        <RejectRequestModal
+          request={rejectingRequest}
+          language={language}
+          user={user}
+          token={token}
+          onClose={() => setRejectingRequest(null)}
+          onRejected={(req) => {
+            setRejectingRequest(null);
+            if (selected?.id === req.id) setSelected(null);
+            loadRequests();
+            setToast(language === 'si'
+              ? 'අයදුම්පත ප්‍රතික්ෂේප කරන ලදී (Application rejected)!'
+              : 'Application rejected successfully!');
           }}
         />
       )}
@@ -2769,9 +3141,29 @@ function AuthPage({ language, setLanguage, t, onLogin }) {
 
 // =========================================================================
 // DETAIL MODAL: Reviewer Verification & Executive Authority Clearance
-// =========================================================================
-function DetailModal({ request, user, t, language, token, onClose, onChanged, onPrintApplication, onPrintOfficerAssessment }) {
+function DetailModal({
+  request,
+  user,
+  t,
+  language,
+  token,
+  onClose,
+  onChanged,
+  onPrintApplication,
+  onPrintOfficerAssessment,
+  onEdit,
+  onDelete,
+  onReject
+}) {
   const hasOfficerSection = Boolean(request.details?.officerCompleted || request.details?.officerAssessment);
+  const userRole = user?.role || 'applicant';
+  const isAdmin = userRole === 'admin';
+  const isOwner = user?.id === request.applicant_id || userRole === 'applicant';
+  const isEditableStatus = ['Pending Department Head Approval', 'Pending Review', 'Returned'].includes(request.status);
+  const canEdit = isAdmin || (isOwner && isEditableStatus);
+  const canDelete = isAdmin || (isOwner && isEditableStatus);
+  const canReject = !['Approved', 'Rejected'].includes(request.status) &&
+    ['department_head', 'reviewer', 'assistant_secretary', 'senior_assistant_secretary', 'additional_secretary', 'secretary', 'authorized_official', 'minister', 'president', 'admin'].includes(userRole);
 
   return (
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -2783,6 +3175,30 @@ function DetailModal({ request, user, t, language, token, onClose, onChanged, on
             <p>{request.applicant_name} · {request.applicant_email}</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Direct Download ZIP Archive (FV-XXXX.zip) */}
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => downloadApplicationZip(request, token)}
+              title={language === 'si' ? `සම්පූර්ණ ලේඛන 7ම අඩංගු ZIP ගොනුව බාගන්න (FV-${String(request.id).padStart(4, '0')}.zip)` : `Download Complete 7-Document ZIP Package (FV-${String(request.id).padStart(4, '0')}.zip)`}
+              style={{
+                height: '32px',
+                padding: '0 12px',
+                fontSize: '11px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: '#1e3a8a',
+                borderColor: '#172554',
+                color: '#ffffff',
+                fontWeight: 700,
+                boxShadow: '0 2px 5px rgba(30, 58, 138, 0.25)'
+              }}
+            >
+              <FolderArchive size={14} />
+              <span>{language === 'si' ? `ZIP බාගන්න (FV-${String(request.id).padStart(4, '0')}.zip)` : `Download ZIP (FV-${String(request.id).padStart(4, '0')}.zip)`}</span>
+            </button>
+
             {onPrintApplication && (
               <button
                 type="button"
@@ -2863,6 +3279,27 @@ function DetailModal({ request, user, t, language, token, onClose, onChanged, on
             <button
               type="button"
               className="secondary-button"
+              onClick={() => printSecretaryApprovalLetterPdf(request)}
+              title={language === 'si' ? 'අමාත්‍යාංශ ලේකම්ගේ නිවාඩු අනුමත ලිපිය (Leave is approved/not approved) PDF ලෙස බාගන්න' : 'Download Ministry Secretary Approval Letter (Leave is approved/not approved) as Separate PDF'}
+              style={{
+                height: '32px',
+                padding: '0 12px',
+                fontSize: '11px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderColor: '#86efac',
+                background: '#f0fdf4',
+                color: '#15803d',
+                fontWeight: 600
+              }}
+            >
+              <FileDown size={14} />
+              <span>{language === 'si' ? 'ලේකම්ගේ ලිපිය PDF' : 'Secretary Letter PDF'}</span>
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
               onClick={() => printNoteSheetMinisterialPdf(request)}
               title={language === 'si' ? 'අවසර පත්‍රිකාව සහ අමාත්‍ය ඉදිරිපත් කිරීම වෙනම PDF ලෙස බාගන්න' : 'Download Clearance Sheet & Ministerial Submission PDF'}
               style={{
@@ -2881,6 +3318,81 @@ function DetailModal({ request, user, t, language, token, onClose, onChanged, on
               <FileDown size={14} />
               <span>{language === 'si' ? 'අවසර පත්‍රිකාව PDF' : 'Clearance Sheet PDF'}</span>
             </button>
+            {/* Edit Button */}
+            {canEdit && onEdit && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => onEdit(request)}
+                title={language === 'si' ? 'අයදුම්පත සංස්කරණය කරන්න' : 'Edit Application'}
+                style={{
+                  height: '32px',
+                  padding: '0 12px',
+                  fontSize: '11px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderColor: '#93c5fd',
+                  background: '#eff6ff',
+                  color: '#1d4ed8',
+                  fontWeight: 600
+                }}
+              >
+                <Edit3 size={13} />
+                <span>{language === 'si' ? 'සංස්කරණය (Edit)' : 'Edit'}</span>
+              </button>
+            )}
+
+            {/* Delete Button */}
+            {canDelete && onDelete && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => onDelete(request)}
+                title={language === 'si' ? 'අයදුම්පත මකා දමන්න' : 'Delete Application'}
+                style={{
+                  height: '32px',
+                  padding: '0 12px',
+                  fontSize: '11px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderColor: '#fca5a5',
+                  background: '#fef2f2',
+                  color: '#dc2626',
+                  fontWeight: 600
+                }}
+              >
+                <Trash2 size={13} />
+                <span>{language === 'si' ? 'මකා දමන්න (Delete)' : 'Delete'}</span>
+              </button>
+            )}
+
+            {/* Reject Button */}
+            {canReject && onReject && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => onReject(request)}
+                title={language === 'si' ? 'අයදුම්පත ප්‍රතික්ෂේප කරන්න' : 'Reject Application'}
+                style={{
+                  height: '32px',
+                  padding: '0 12px',
+                  fontSize: '11px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderColor: '#fca5a5',
+                  background: '#fee2e2',
+                  color: '#b91c1c',
+                  fontWeight: 700
+                }}
+              >
+                <AlertCircle size={13} />
+                <span>{language === 'si' ? 'ප්‍රතික්ෂේප කරන්න (Reject)' : 'Reject'}</span>
+              </button>
+            )}
+
             <button className="icon-button" onClick={onClose} aria-label={t.close}>
               <X size={19} />
             </button>
@@ -2888,6 +3400,74 @@ function DetailModal({ request, user, t, language, token, onClose, onChanged, on
         </header>
 
         <div className="detail-body">
+          {/* Top Live Process Status Banner */}
+          {(() => {
+            const sInfo = getHierarchyStatusInfo(request, language);
+            return (
+              <div style={{
+                background: sInfo.bg,
+                border: `1.5px solid ${sInfo.border}`,
+                borderRadius: '8px',
+                padding: '12px 16px',
+                marginBottom: '16px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    background: sInfo.color,
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '13px',
+                    fontWeight: 800,
+                    flexShrink: 0
+                  }}>
+                    {sInfo.isApproved ? '✓' : sInfo.isRejected ? '✕' : `${sInfo.step}/9`}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '10.5px', textTransform: 'uppercase', letterSpacing: '0.5px', color: sInfo.color, fontWeight: 800 }}>
+                      {language === 'si' ? 'අයදුම්පත් ක්‍රියාවලි තත්ත්වය (Application Process Status)' : 'Application Process Status'}
+                    </div>
+                    <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#0f172a', marginTop: '1px' }}>
+                      {sInfo.title}
+                    </div>
+                    <div style={{ fontSize: '11.5px', color: '#475569', marginTop: '2px' }}>
+                      {sInfo.desk}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: 800,
+                    color: sInfo.color,
+                    background: '#ffffff',
+                    border: `1px solid ${sInfo.border}`,
+                    padding: '4px 10px',
+                    borderRadius: '12px'
+                  }}>
+                    {sInfo.percent}% {language === 'si' ? 'සම්පූර්ණයි' : 'Completed'}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* 7-Document Application Package ZIP Card */}
+          <ApplicationZipPackageCard
+            request={request}
+            token={token}
+            language={language}
+          />
+
           <div className="detail-facts">
             <div>
               <span>{t.dates}</span>

@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { generateRequestZip } from './zip-generator.js';
 
 const app = express();
 const port = Number(process.env.PORT || 3001);
@@ -256,7 +257,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 function authenticate(req, res, next) {
-  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '') || req.query.token;
   try {
     req.user = jwt.verify(token, secret);
     next();
@@ -1061,6 +1062,149 @@ app.post('/api/requests/:id/department-head-endorsement', authenticate, (req, re
   });
 });
 
+app.put('/api/requests/:id', authenticate, (req, res) => {
+  const requestId = Number(req.params.id);
+  const request = db.prepare('SELECT * FROM requests WHERE id = ?').get(requestId);
+  if (!request) return res.status(404).json({ error: 'Request not found.' });
+
+  const isAdmin = req.user.role === 'admin';
+  const isOwner = req.user.id === request.applicant_id;
+  if (!isAdmin && !isOwner) {
+    return res.status(403).json({ error: 'You are not authorized to edit this request.' });
+  }
+
+  // Editable statuses
+  const editableStatuses = ['Pending Department Head Approval', 'Pending Review', 'Returned'];
+  if (!isAdmin && !editableStatuses.includes(request.status)) {
+    return res.status(400).json({ error: `Cannot edit request in status "${request.status}". Only pending or returned requests can be edited.` });
+  }
+
+  const { destination, purpose, startDate, endDate, leaveType, details, signature } = req.body || {};
+  const currentDetails = JSON.parse(request.details_json || '{}');
+  const mergedDetails = {
+    ...currentDetails,
+    ...(details || {}),
+  };
+
+  const newDestination = destination?.trim() || request.destination;
+  const newPurpose = purpose?.trim() || request.purpose;
+  const newStartDate = startDate || request.start_date;
+  const newEndDate = endDate || request.end_date;
+  const newLeaveType = leaveType || request.leave_type;
+  const newSignature = signature || request.signature;
+
+  if (newEndDate < newStartDate) {
+    return res.status(400).json({ error: 'End date must be on or after start date.' });
+  }
+
+  try {
+    db.prepare(`
+      UPDATE requests
+      SET destination = ?, purpose = ?, start_date = ?, end_date = ?, leave_type = ?, signature = ?, details_json = ?
+      WHERE id = ?
+    `).run(
+      newDestination,
+      newPurpose,
+      newStartDate,
+      newEndDate,
+      newLeaveType,
+      newSignature,
+      JSON.stringify(mergedDetails),
+      requestId
+    );
+
+    db.prepare('INSERT INTO approvals (request_id, user_id, decision, note) VALUES (?, ?, ?, ?)').run(
+      requestId,
+      req.user.id,
+      'edit',
+      `Application updated by ${req.user.name} (${req.user.role}).`
+    );
+
+    const updated = db.prepare('SELECT * FROM requests WHERE id = ?').get(requestId);
+    res.json({
+      success: true,
+      message: `Request FV-${String(requestId).padStart(4, '0')} updated successfully.`,
+      request: {
+        ...updated,
+        details: mergedDetails
+      }
+    });
+  } catch (err) {
+    console.error('Error updating request:', err);
+    res.status(500).json({ error: 'Failed to update request.' });
+  }
+});
+
+app.post('/api/requests/:id/reject', authenticate, (req, res) => {
+  const requestId = Number(req.params.id);
+  const request = db.prepare('SELECT * FROM requests WHERE id = ?').get(requestId);
+  if (!request) return res.status(404).json({ error: 'Request not found.' });
+
+  const allowedRoles = ['department_head', 'reviewer', 'assistant_secretary', 'senior_assistant_secretary', 'additional_secretary', 'secretary', 'authorized_official', 'minister', 'president', 'admin'];
+  if (!allowedRoles.includes(req.user.role)) {
+    return res.status(403).json({ error: 'You are not authorized to reject applications.' });
+  }
+
+  const { reason, note, signature } = req.body || {};
+  const rejectionNote = (reason || note || '').trim();
+  if (!rejectionNote) {
+    return res.status(400).json({ error: 'Rejection reason / remarks are required.' });
+  }
+
+  const existingDetails = JSON.parse(request.details_json || '{}');
+  const rejectionRecord = {
+    rejectedBy: {
+      id: req.user.id,
+      name: req.user.name,
+      role: req.user.role,
+      designation: req.user.designation || req.user.role,
+    },
+    reason: rejectionNote,
+    signature: signature || null,
+    date: new Date().toISOString().slice(0, 10),
+    timestamp: new Date().toISOString(),
+  };
+
+  const updatedDetails = {
+    ...existingDetails,
+    rejectionRecord,
+  };
+
+  try {
+    db.exec('BEGIN');
+    db.prepare('UPDATE requests SET status = ?, details_json = ? WHERE id = ?').run(
+      'Rejected',
+      JSON.stringify(updatedDetails),
+      requestId
+    );
+
+    db.prepare('INSERT INTO approvals (request_id, user_id, decision, note) VALUES (?, ?, ?, ?)').run(
+      requestId,
+      req.user.id,
+      'reject',
+      `Application rejected by ${req.user.name} (${req.user.role}): ${rejectionNote.slice(0, 400)}`
+    );
+
+    db.prepare(`
+      INSERT INTO notifications (user_id, role_target, request_id, title, message, type)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      request.applicant_id,
+      null,
+      requestId,
+      'Application Rejected (නිවාඩු අනුමත නොකරමි)',
+      `Your foreign leave application FV-${String(requestId).padStart(4, '0')} has been rejected by ${req.user.name} (${req.user.role}). Reason: ${rejectionNote}`,
+      'error'
+    );
+
+    db.exec('COMMIT');
+    res.json({ success: true, status: 'Rejected', message: 'Application rejected successfully.' });
+  } catch (err) {
+    db.exec('ROLLBACK');
+    res.status(500).json({ error: 'Failed to reject request.' });
+  }
+});
+
 app.delete('/api/requests/:id', authenticate, (req, res) => {
   const requestId = Number(req.params.id);
   const request = db.prepare('SELECT * FROM requests WHERE id = ?').get(requestId);
@@ -1083,6 +1227,36 @@ app.delete('/api/requests/:id', authenticate, (req, res) => {
   } catch (err) {
     db.exec('ROLLBACK');
     res.status(500).json({ error: 'Failed to delete request.' });
+  }
+});
+
+// Download Complete Application Dossier as ZIP (7 Items)
+app.get('/api/requests/:id/download-zip', authenticate, async (req, res) => {
+  const requestId = Number(req.params.id);
+  const request = db.prepare(`
+    SELECT r.*, u.name AS applicant_name, u.email AS applicant_email
+    FROM requests r
+    JOIN users u ON u.id = r.applicant_id
+    WHERE r.id = ?
+  `).get(requestId);
+  if (!request) return res.status(404).json({ error: 'Request not found.' });
+
+  const isOwner = req.user.id === request.applicant_id;
+  const isApprover = ['department_head', 'reviewer', 'assistant_secretary', 'senior_assistant_secretary', 'additional_secretary', 'secretary', 'authorized_official', 'minister', 'president', 'admin'].includes(req.user.role);
+  if (!isOwner && !isApprover) {
+    return res.status(403).json({ error: 'You are not authorized to download this application dossier.' });
+  }
+
+  try {
+    request.details = JSON.parse(request.details_json || '{}');
+    const { filename, buffer } = await generateRequestZip(request);
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', buffer.length);
+    res.send(buffer);
+  } catch (err) {
+    console.error('Error generating application ZIP archive:', err);
+    res.status(500).json({ error: 'Failed to generate application ZIP package.' });
   }
 });
 

@@ -29,7 +29,8 @@ import {
   UserCheck,
   ChevronRight,
   FileDown,
-  Printer
+  Printer,
+  FolderArchive
 } from 'lucide-react';
 import SignaturePad from './signature-pad.jsx';
 
@@ -637,30 +638,41 @@ export default function RequestModal({
   onClose,
   onSubmitted,
   initialLeaveType = 'official',
+  editingRequest = null,
 }) {
-  const isOfficial = initialLeaveType === 'official';
+  const isEditing = Boolean(editingRequest);
+  const editDetails = editingRequest?.details || {};
+  const effectiveLeaveType = isEditing
+    ? (editingRequest.leave_type === 'Official duty' || editDetails.leaveType === 'Official duty' ? 'official' : 'personal')
+    : initialLeaveType;
+  const isOfficial = effectiveLeaveType === 'official';
   const defaultCategory = isOfficial ? 'Official duty' : 'Annual / vacation leave';
-  const labels = formText[language];
+  const labels = formText[language] || formText.en;
 
   // For both official & personal: Step 1 (Gen-126) -> Step 2 (Official: App 16, Personal: Live Documents)
   const [step, setStep] = useState(1);
 
   const [form, setForm] = useState({
     ...initialDetails,
-    fullName: user?.name || '',
-    leaveCategory: defaultCategory,
-    airfareFunding: isOfficial
+    ...editDetails,
+    fullName: editDetails.fullName || editingRequest?.applicant_name || user?.name || '',
+    destination: editDetails.destination || editingRequest?.destination || '',
+    purpose: editDetails.purpose || editingRequest?.purpose || '',
+    startDate: editDetails.startDate || editingRequest?.start_date || '',
+    endDate: editDetails.endDate || editingRequest?.end_date || '',
+    leaveCategory: editDetails.leaveCategory || defaultCategory,
+    airfareFunding: editDetails.airfareFunding || (isOfficial
       ? (language === 'si' ? 'ශ්‍රී ලංකා රජය / නිල අනුග්‍රහය' : 'Government of Sri Lanka (GOSL)')
-      : (language === 'si' ? 'පෞද්ගලික වියදමින්' : 'Self-funded'),
-    maintenanceFunding: isOfficial
+      : (language === 'si' ? 'පෞද්ගලික වියදමින්' : 'Self-funded')),
+    maintenanceFunding: editDetails.maintenanceFunding || (isOfficial
       ? (language === 'si' ? 'නිල දීමනා / ආයතනික අනුග්‍රහය' : 'Official subsistence / Sponsoring agency')
-      : (language === 'si' ? 'පෞද්ගලික ඉතුරුම් වලින්' : 'Personal savings'),
-    fundingSource: isOfficial ? 'Government of Sri Lanka (GOSL)' : 'Private funds',
-    applicationDate: new Date().toISOString().slice(0, 10),
+      : (language === 'si' ? 'පෞද්ගලික ඉතුරුම් වලින්' : 'Personal savings')),
+    fundingSource: editDetails.fundingSource || (isOfficial ? 'Government of Sri Lanka (GOSL)' : 'Private funds'),
+    applicationDate: editDetails.applicationDate || editingRequest?.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10),
   });
 
-  const [signature, setSignature] = useState('');
-  const [declaration, setDeclaration] = useState(false);
+  const [signature, setSignature] = useState(editingRequest?.signature || editDetails.signature || '');
+  const [declaration, setDeclaration] = useState(isEditing ? true : false);
   const [previewDoc, setPreviewDoc] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -861,8 +873,11 @@ export default function RequestModal({
         },
       };
 
-      const response = await fetch('/api/requests', {
-        method: 'POST',
+      const url = isEditing ? `/api/requests/${editingRequest.id}` : '/api/requests';
+      const method = isEditing ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
@@ -896,9 +911,13 @@ export default function RequestModal({
                 : (step === 1 ? labels.step1Tag : labels.step2Tag)}
             </div>
             <h2>
-              {isOfficial
-                ? (step === 1 ? labels.gen126Title : labels.app16Title)
-                : (step === 1 ? labels.gen126Title : labels.docsHeading)}
+              {isEditing
+                ? (language === 'si'
+                    ? `අයදුම්පත සංස්කරණය · FV-${String(editingRequest.id).padStart(4, '0')}`
+                    : `Edit Application · FV-${String(editingRequest.id).padStart(4, '0')}`)
+                : (isOfficial
+                    ? (step === 1 ? labels.gen126Title : labels.app16Title)
+                    : (step === 1 ? labels.gen126Title : labels.docsHeading))}
             </h2>
             <div className={`modal-leave-tag ${isOfficial ? 'official' : 'personal'}`}>
               {isOfficial ? (
@@ -1728,7 +1747,7 @@ export default function RequestModal({
                   className="primary-button"
                   disabled={busy || !signature || !declaration}
                 >
-                  {busy ? '…' : labels.submitOfficialBtn}
+                  {busy ? '…' : (isEditing ? (language === 'si' ? 'වෙනස්කම් සුරකින්න' : 'Save Changes') : labels.submitOfficialBtn)}
                   <Check size={15} />
                 </button>
               </>
@@ -1765,7 +1784,7 @@ export default function RequestModal({
                   className="primary-button"
                   disabled={busy}
                 >
-                  {busy ? '…' : labels.submitPersonalBtn}
+                  {busy ? '…' : (isEditing ? (language === 'si' ? 'වෙනස්කම් සුරකින්න' : 'Save Changes') : labels.submitPersonalBtn)}
                   <Check size={15} />
                 </button>
               </>
@@ -1875,6 +1894,1429 @@ function DocumentCheck({ checked, onChange, label }) {
       <input type="checkbox" checked={checked} onChange={onChange} />
       <span>{label}</span>
     </label>
+  );
+}
+
+// =========================================================================
+// OFFICIAL 9-STAGE WORKFLOW HIERARCHY STEPPER
+// Applicant ➔ Head Department ➔ Subject Officer ➔ Assistant Secretary ➔ Senior Assistant Secretary ➔ Additional Secretary ➔ Secretary ➔ President ➔ Applicant (Leave is approved/not approved)
+// =========================================================================
+export function WorkflowHierarchyStepper({ request, language = 'en' }) {
+  if (!request) return null;
+
+  const d = request.details || (request.applicant_name ? request : {});
+  const status = request.status || 'Pending';
+  const clearances = Array.isArray(d.secretariatClearances) ? d.secretariatClearances : [];
+  const endorsement = d.departmentHeadEndorsement;
+  const assessment = d.officerAssessment || d.officerCompleted;
+  const secApproval = d.secretaryApproval || clearances.find(c => c.role === 'secretary' || c.decision === 'approve');
+  const presDecision = d.presidentialDecision;
+
+  // Determine active step index (0-indexed: 0=Applicant, 1=Dept Head, 2=Subject Officer, 3=Asst Sec, 4=Senior Asst Sec, 5=Addl Sec, 6=Secretary, 7=President, 8=Final Outcome)
+  let activeIndex = 0;
+  if (status === 'Approved' || status === 'Rejected' || presDecision) {
+    activeIndex = 8;
+  } else if (status === 'Pending Presidential Approval') {
+    activeIndex = 7;
+  } else if (status === 'Pending Secretary Approval' || status === 'Pending Official Authorization') {
+    activeIndex = 6;
+  } else if (status === 'Pending Additional Secretary Review') {
+    activeIndex = 5;
+  } else if (status === 'Pending Senior Assistant Secretary Review') {
+    activeIndex = 4;
+  } else if (status === 'Pending Assistant Secretary Review') {
+    activeIndex = 3;
+  } else if (status === 'Pending Review') {
+    activeIndex = 2;
+  } else if (status === 'Pending Department Head Approval') {
+    activeIndex = 1;
+  } else {
+    activeIndex = 0;
+  }
+
+  const asCl = clearances.find(c => c.role === 'assistant_secretary');
+  const sasCl = clearances.find(c => c.role === 'senior_assistant_secretary');
+  const adsCl = clearances.find(c => c.role === 'additional_secretary');
+
+  const steps = [
+    {
+      step: 1,
+      id: 'applicant',
+      titleEn: 'Applicant',
+      titleSi: 'අයදුම්කරු',
+      descEn: 'Submission (Gen 126)',
+      descSi: 'අයදුම්පත යොමු කිරීම',
+      actor: request.applicant_name || d.fullName || 'Applicant',
+      date: request.created_at?.slice(0, 10),
+      isCompleted: true,
+      isActive: false
+    },
+    {
+      step: 2,
+      id: 'department_head',
+      titleEn: 'Head Department',
+      titleSi: 'දෙපාර්තමේන්තු ප්‍රධානී',
+      descEn: 'Endorsement (XV 10:1)',
+      descSi: 'ආයතනික නිර්දේශය',
+      actor: endorsement?.completedBy?.name || (endorsement ? 'Head of Dept' : null),
+      date: endorsement?.date,
+      isCompleted: Boolean(endorsement) || activeIndex > 1,
+      isActive: activeIndex === 1
+    },
+    {
+      step: 3,
+      id: 'subject_officer',
+      titleEn: 'Subject Officer',
+      titleSi: 'විෂයභාර නිලධාරී',
+      descEn: 'Leave Classification',
+      descSi: 'නිවාඩු වර්ගීකරණය',
+      actor: d.officerCompletedBy?.name || clearances.find(c => c.role === 'reviewer')?.userName,
+      date: d.officerCompletedAt?.slice(0, 10),
+      isCompleted: Boolean(assessment) || activeIndex > 2,
+      isActive: activeIndex === 2
+    },
+    {
+      step: 4,
+      id: 'assistant_secretary',
+      titleEn: 'Assistant Secretary',
+      titleSi: 'සහකාර ලේකම්',
+      descEn: '1st Tier Review',
+      descSi: 'පළමු පෙළ සටහන',
+      actor: asCl?.userName,
+      date: asCl?.date,
+      isCompleted: Boolean(asCl) || activeIndex > 3,
+      isActive: activeIndex === 3
+    },
+    {
+      step: 5,
+      id: 'senior_assistant_secretary',
+      titleEn: 'Senior Assistant Secretary',
+      titleSi: 'ජ්‍යෙෂ්ඨ සහකාර ලේකම්',
+      descEn: 'Senior Secretariat Minute',
+      descSi: 'ජ්‍යෙෂ්ඨ අමාත්‍යාංශ සටහන',
+      actor: sasCl?.userName,
+      date: sasCl?.date,
+      isCompleted: Boolean(sasCl) || activeIndex > 4,
+      isActive: activeIndex === 4
+    },
+    {
+      step: 6,
+      id: 'additional_secretary',
+      titleEn: 'Additional Secretary',
+      titleSi: 'අතිරේක ලේකම්',
+      descEn: 'Divisional Clearance',
+      descSi: 'අංශ සමාලෝචනය',
+      actor: adsCl?.userName,
+      date: adsCl?.date,
+      isCompleted: Boolean(adsCl) || activeIndex > 5,
+      isActive: activeIndex === 5
+    },
+    {
+      step: 7,
+      id: 'secretary',
+      titleEn: 'Secretary',
+      titleSi: 'අමාත්‍යාංශ ලේකම්',
+      descEn: 'Leave Approval & Submission',
+      descSi: 'අනුමත ලිපිය හා ඉදිරිපත් කිරීම',
+      actor: secApproval?.userName || secApproval?.signatoryName || (status === 'Approved' ? 'වරුෂණ ශ්‍රී ධනපාල' : null),
+      date: secApproval?.date || secApproval?.timestamp?.slice(0, 10),
+      isCompleted: Boolean(secApproval) || activeIndex > 6,
+      isActive: activeIndex === 6
+    },
+    {
+      step: 8,
+      id: 'president',
+      titleEn: 'President',
+      titleSi: 'ගරු ජනාධිපතිතුමා',
+      descEn: 'Constitutional Executive Order',
+      descSi: 'අවසාන විධායක නියෝගය',
+      actor: presDecision?.userName || (presDecision ? 'අතිගරු ජනාධිපතිතුමා' : null),
+      date: presDecision?.date,
+      isCompleted: Boolean(presDecision) || status === 'Approved' || status === 'Rejected',
+      isActive: activeIndex === 7
+    },
+    {
+      step: 9,
+      id: 'applicant_outcome',
+      titleEn: 'Applicant',
+      titleSi: 'අයදුම්කරු',
+      descEn: status === 'Approved' ? 'Leave is approved' : status === 'Rejected' ? 'Leave is not approved' : 'Decision Pending',
+      descSi: status === 'Approved' ? 'නිවාඩුව අනුමතයි' : status === 'Rejected' ? 'නිවාඩු අනුමත නැත' : 'තීරණය අපේක්ෂාවෙන්',
+      actor: status === 'Approved' ? '✓ APPROVED' : status === 'Rejected' ? '✕ NOT APPROVED' : null,
+      date: presDecision?.date || request.updated_at?.slice(0, 10),
+      isCompleted: status === 'Approved' || status === 'Rejected',
+      isActive: activeIndex === 8,
+      isOutcome: true,
+      isApproved: status === 'Approved',
+      isRejected: status === 'Rejected'
+    }
+  ];
+
+  const currentStep = steps[activeIndex] || steps[0];
+  const isApproved = status === 'Approved';
+  const isRejected = status === 'Rejected';
+
+  return (
+    <div style={{
+      background: '#ffffff',
+      border: '1.5px solid #cbd5e1',
+      borderRadius: '10px',
+      padding: '16px 18px',
+      marginBottom: '20px',
+      boxShadow: '0 2px 8px rgba(15, 23, 42, 0.05)'
+    }}>
+      {/* Stepper Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Scale size={18} style={{ color: '#2563eb' }} />
+          <div>
+            <strong style={{ fontSize: '13px', color: '#0f172a' }}>
+              {language === 'si' ? 'නිල අනුමැති ධුරාවලිය (Official Approval Hierarchy)' : 'Official Approval Hierarchy'}
+            </strong>
+          </div>
+        </div>
+
+        <div style={{
+          fontSize: '11px',
+          fontWeight: 700,
+          padding: '4px 12px',
+          borderRadius: '14px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          background: isApproved ? '#dcfce7' : isRejected ? '#fee2e2' : '#eff6ff',
+          color: isApproved ? '#15803d' : isRejected ? '#b91c1c' : '#1d4ed8',
+          border: `1px solid ${isApproved ? '#86efac' : isRejected ? '#fca5a5' : '#93c5fd'}`
+        }}>
+          {isApproved ? (
+            <span>✓ {language === 'si' ? 'පියවර 9/9: නිවාඩුව අනුමතයි (Leave is approved)' : 'Step 9/9: Leave is approved'}</span>
+          ) : isRejected ? (
+            <span>✕ {language === 'si' ? 'පියවර 9/9: නිවාඩු අනුමත නැත (Leave is not approved)' : 'Step 9/9: Leave is not approved'}</span>
+          ) : (
+            <span>
+              ⚡ {language === 'si'
+                ? `පියවර ${currentStep.step} / 9: ${currentStep.titleSi} (දැන් පවතින පියවර)`
+                : `Step ${currentStep.step} of 9: ${currentStep.titleEn} (In Progress)`}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Exact User Prompt Hierarchy Breadcrumb Chain */}
+      <div style={{
+        background: '#f8fafc',
+        border: '1px solid #e2e8f0',
+        borderRadius: '6px',
+        padding: '8px 12px',
+        marginBottom: '16px',
+        fontSize: '11px',
+        color: '#475569',
+        overflowX: 'auto',
+        whiteSpace: 'nowrap'
+      }}>
+        <span style={{ fontWeight: 700, color: '#334155', marginRight: '6px' }}>
+          {language === 'si' ? 'ධුරාවලි පෙළගැස්ම:' : 'Workflow Chain:'}
+        </span>
+        {steps.map((s, idx) => {
+          const isCurrent = s.isActive;
+          const isDone = s.isCompleted && !isCurrent;
+          return (
+            <span key={s.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
+              <span style={{
+                fontWeight: isCurrent ? 800 : isDone ? 600 : 500,
+                color: isCurrent ? '#1d4ed8' : isDone ? '#15803d' : '#64748b',
+                background: isCurrent ? '#dbeafe' : 'transparent',
+                padding: isCurrent ? '2px 8px' : '0 2px',
+                borderRadius: '4px',
+                border: isCurrent ? '1px solid #93c5fd' : 'none'
+              }}>
+                {s.titleEn}
+                {s.isOutcome ? ` (${status === 'Approved' ? 'Leave is approved' : status === 'Rejected' ? 'Leave is not approved' : 'Leave is approved/not approved'})` : ''}
+              </span>
+              {idx < steps.length - 1 && (
+                <span style={{ margin: '0 6px', color: '#94a3b8', fontWeight: 'bold' }}>➔</span>
+              )}
+            </span>
+          );
+        })}
+      </div>
+
+      {/* Horizontal Interactive Stepper Track */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        overflowX: 'auto',
+        paddingBottom: '8px',
+        scrollbarWidth: 'thin'
+      }}>
+        {steps.map((s, idx) => {
+          const isCurrent = s.isActive;
+          const isDone = s.isCompleted && !isCurrent;
+          const isLast = idx === steps.length - 1;
+
+          let badgeBg = '#f1f5f9';
+          let badgeColor = '#64748b';
+          let badgeBorder = '#cbd5e1';
+
+          if (s.isOutcome) {
+            if (s.isApproved) {
+              badgeBg = '#16a34a';
+              badgeColor = '#ffffff';
+              badgeBorder = '#15803d';
+            } else if (s.isRejected) {
+              badgeBg = '#dc2626';
+              badgeColor = '#ffffff';
+              badgeBorder = '#b91c1c';
+            } else if (isCurrent) {
+              badgeBg = '#2563eb';
+              badgeColor = '#ffffff';
+              badgeBorder = '#1d4ed8';
+            }
+          } else if (isDone) {
+            badgeBg = '#16a34a';
+            badgeColor = '#ffffff';
+            badgeBorder = '#15803d';
+          } else if (isCurrent) {
+            badgeBg = '#2563eb';
+            badgeColor = '#ffffff';
+            badgeBorder = '#1d4ed8';
+          }
+
+          return (
+            <div
+              key={s.id}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                minWidth: '124px',
+                position: 'relative',
+                flexShrink: 0,
+                textAlign: 'center'
+              }}
+            >
+              {/* Top Connector Line */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                width: '100%',
+                marginBottom: '8px'
+              }}>
+                <div style={{
+                  flex: 1,
+                  height: '3px',
+                  background: idx === 0 ? 'transparent' : (steps[idx - 1]?.isCompleted ? '#16a34a' : '#e2e8f0')
+                }} />
+
+                {/* Circular Badge */}
+                <div style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  background: badgeBg,
+                  color: badgeColor,
+                  border: `2px solid ${badgeBorder}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  boxShadow: isCurrent ? '0 0 0 4px rgba(37, 99, 235, 0.2)' : 'none',
+                  flexShrink: 0,
+                  zIndex: 2,
+                  transition: 'all 0.2s ease'
+                }}>
+                  {s.isOutcome ? (
+                    s.isApproved ? '✓✓' : s.isRejected ? '✕' : '9'
+                  ) : isDone ? (
+                    <Check size={14} />
+                  ) : isCurrent ? (
+                    <Clock size={13} />
+                  ) : (
+                    s.step
+                  )}
+                </div>
+
+                <div style={{
+                  flex: 1,
+                  height: '3px',
+                  background: isLast ? 'transparent' : (s.isCompleted ? '#16a34a' : '#e2e8f0')
+                }} />
+              </div>
+
+              {/* Step Title & Subtitle */}
+              <div style={{ padding: '0 4px' }}>
+                <div style={{
+                  fontSize: '11.5px',
+                  fontWeight: isCurrent ? 800 : isDone ? 700 : 600,
+                  color: isCurrent ? '#1d4ed8' : isDone ? '#0f172a' : '#64748b',
+                  lineHeight: 1.25,
+                  marginBottom: '2px'
+                }}>
+                  {language === 'si' ? s.titleSi : s.titleEn}
+                </div>
+
+                <div style={{
+                  fontSize: '10px',
+                  color: isCurrent ? '#2563eb' : isDone ? '#059669' : '#94a3b8',
+                  lineHeight: 1.2
+                }}>
+                  {language === 'si' ? s.descSi : s.descEn}
+                </div>
+
+                {s.actor && (
+                  <div style={{
+                    fontSize: '9.5px',
+                    color: isDone ? '#166534' : '#64748b',
+                    background: isDone ? '#f0fdf4' : '#f8fafc',
+                    border: `1px solid ${isDone ? '#bbf7d0' : '#e2e8f0'}`,
+                    borderRadius: '4px',
+                    padding: '1px 4px',
+                    marginTop: '4px',
+                    maxWidth: '118px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }} title={s.actor}>
+                    {isDone ? `✓ ${s.actor}` : s.actor}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// =========================================================================
+// HIERARCHY STATUS INFO HELPER
+// Maps any application state to the exact 9-stage workflow hierarchy step
+// =========================================================================
+export function getHierarchyStatusInfo(request, language = 'en') {
+  if (!request) {
+    return {
+      step: 1,
+      total: 9,
+      percent: 11,
+      stepId: 'applicant',
+      title: language === 'si' ? 'අයදුම්කරු යොමු කිරීම' : 'Applicant Submission',
+      titleEn: 'Applicant Submission',
+      titleSi: 'අයදුම්කරු යොමු කිරීම',
+      desk: language === 'si' ? 'අයදුම්පත ඉදිරිපත් කරන ලදී' : 'Application submitted',
+      deskEn: 'Application submitted',
+      deskSi: 'අයදුම්පත ඉදිරිපත් කරන ලදී',
+      nextDesk: language === 'si' ? 'දෙපාර්තමේන්තු ප්‍රධානී' : 'Head of Department',
+      nextDeskEn: 'Head of Department',
+      nextDeskSi: 'දෙපාර්තමේන්තු ප්‍රධානී',
+      color: '#2563eb',
+      bg: '#eff6ff',
+      border: '#93c5fd',
+      isApproved: false,
+      isRejected: false,
+      isCompleted: false,
+      statusText: language === 'si' ? 'පියවර 1/9: යොමු කරන ලදී' : 'Step 1/9: Submitted',
+    };
+  }
+
+  const d = request.details || (request.applicant_name ? request : {});
+  const status = request.status || 'Pending';
+  const isApproved = status === 'Approved';
+  const isRejected = status === 'Rejected';
+
+  let step = 1;
+  let percent = 11;
+  let stepId = 'applicant';
+  let titleEn = 'Applicant Submission';
+  let titleSi = 'අයදුම්කරු (සාමාන්‍ය 126 අයදුම්පත ඉදිරිපත් කිරීම)';
+  let deskEn = 'General 126 leave application submitted by applicant.';
+  let deskSi = 'අයදුම්කරු විසින් සාමාන්‍ය 126 අයදුම්පත පද්ධතියට ඉදිරිපත් කර ඇත.';
+  let nextDeskEn = 'Head of Department (Est. Code XV 10:1 Endorsement)';
+  let nextDeskSi = 'දෙපාර්තමේන්තු ප්‍රධානී (ආයතන සංග්‍රහය XV 10:1 නිර්දේශය)';
+  let color = '#2563eb';
+  let bg = '#eff6ff';
+  let border = '#93c5fd';
+
+  if (isApproved) {
+    step = 9;
+    percent = 100;
+    stepId = 'applicant_outcome';
+    titleEn = 'Leave is approved (Approved by President)';
+    titleSi = 'නිවාඩුව අනුමතයි (අතිගරු ජනාධිපතිතුමා විසින් අනුමත කරන ලදී)';
+    deskEn = 'Final constitutional executive order granted: "නිවාඩුව අනුමත කරමි". Official travel authorized.';
+    deskSi = 'අතිගරු ජනාධිපතිතුමා විසින් "නිවාඩුව අනුමත කරමි" යනුවෙන් නිවාඩු අනුමැතිය ලබා දී ඇත. විදේශ සංචාරය නිල වශයෙන් වලංගු වේ.';
+    nextDeskEn = 'Application completed · Official travel authorized';
+    nextDeskSi = 'ක්‍රියාවලිය සාර්ථකව අවසන් · විදේශ සංචාරය අනුමතයි';
+    color = '#15803d';
+    bg = '#dcfce7';
+    border = '#86efac';
+  } else if (isRejected) {
+    step = 9;
+    percent = 100;
+    stepId = 'applicant_outcome';
+    titleEn = 'Leave is not approved';
+    titleSi = 'නිවාඩු අනුමත නැත (Leave is not approved)';
+    deskEn = 'Application not approved by the Presidential Secretariat / Ministry ("නිවාඩු අනුමත නොකරමි").';
+    deskSi = 'අතිගරු ජනාධිපතිතුමා / අමාත්‍යාංශය මඟින් "නිවාඩු අනුමත නොකරමි" යනුවෙන් තීරණය කර ඇත.';
+    nextDeskEn = 'Application concluded';
+    nextDeskSi = 'අයදුම්පතේ ක්‍රියාවලිය අවසන්';
+    color = '#b91c1c';
+    bg = '#fee2e2';
+    border = '#fca5a5';
+  } else if (status === 'Pending Presidential Approval') {
+    step = 8;
+    percent = 88;
+    stepId = 'president';
+    titleEn = 'Hon. President (Final Executive Order)';
+    titleSi = 'ගරු ජනාධිපතිතුමා (අවසාන විධායක නියෝගය)';
+    deskEn = 'Currently submitted to Hon. President for constitutional executive order ("නිවාඩුව අනුමත කරමි / නිවාඩු අනුමත නොකරමි").';
+    deskSi = 'අතිගරු ජනාධිපතිතුමාගේ අවසාන විධායක නියෝගය ("නිවාඩුව අනුමත කරමි / නිවාඩු අනුමත නොකරමි") සඳහා ජනාධිපති ලේකම් කාර්යාලය වෙත ඉදිරිපත් කර ඇත.';
+    nextDeskEn = 'Applicant (Final Leave Outcome)';
+    nextDeskSi = 'අයදුම්කරු (අවසාන තීරණය දැනුම් දීම)';
+    color = '#7c3aed';
+    bg = '#f5f3ff';
+    border = '#c4b5fd';
+  } else if (status === 'Pending Secretary Approval' || status === 'Pending Official Authorization') {
+    step = 7;
+    percent = 77;
+    stepId = 'secretary';
+    titleEn = 'Ministry Secretary (Leave Approval & Submission to President)';
+    titleSi = 'අමාත්‍යාංශ ලේකම් (නිවාඩු නිර්දේශය හා ජනාධිපතිතුමා වෙත ඉදිරිපත් කිරීම)';
+    deskEn = 'Currently with the Ministry Secretary to sign official leave approval under Est. Code XV 10:1 Part 2 and submit to Hon. President.';
+    deskSi = 'ආයතන සංග්‍රහය XV 10:1 (II) කොටස යටතේ නිවාඩු අනුමත කර අතිගරු ජනාධිපතිතුමා වෙත ඉදිරිපත් කිරීමට අමාත්‍යාංශ ලේකම් වෙත යොමු කර ඇත.';
+    nextDeskEn = 'Hon. President (Presidential Secretariat)';
+    nextDeskSi = 'ගරු ජනාධිපතිතුමා (ජනාධිපති ලේකම් කාර්යාලය)';
+    color = '#0284c7';
+    bg = '#f0f9ff';
+    border = '#7dd3fc';
+  } else if (status === 'Pending Additional Secretary Review') {
+    step = 6;
+    percent = 66;
+    stepId = 'additional_secretary';
+    titleEn = 'Additional Secretary Review';
+    titleSi = 'අතිරේක ලේකම් (අංශ සමාලෝචනය)';
+    deskEn = 'Currently with the Additional Secretary for divisional assessment and administrative minute.';
+    deskSi = 'අංශ සමාලෝචනය හා අමාත්‍යාංශ සටහන් තැබීම සඳහා අතිරේක ලේකම් වෙත යොමු කර ඇත.';
+    nextDeskEn = 'Ministry Secretary';
+    nextDeskSi = 'අමාත්‍යාංශ ලේකම්';
+    color = '#0d9488';
+    bg = '#f0fdfa';
+    border = '#99f6e4';
+  } else if (status === 'Pending Senior Assistant Secretary Review') {
+    step = 5;
+    percent = 55;
+    stepId = 'senior_assistant_secretary';
+    titleEn = 'Senior Assistant Secretary Review';
+    titleSi = 'ජ්‍යෙෂ්ඨ සහකාර ලේකම් (ජ්‍යෙෂ්ඨ සටහන් හා නිරීක්ෂණ)';
+    deskEn = 'Currently with Senior Assistant Secretary for ministerial assessment and note.';
+    deskSi = 'අමාත්‍යාංශ සටහන් හා නිර්දේශ ඇගයීම සඳහා ජ්‍යෙෂ්ඨ සහකාර ලේකම් වෙත යොමු කර ඇත.';
+    nextDeskEn = 'Additional Secretary';
+    nextDeskSi = 'අතිරේක ලේකම්';
+    color = '#0284c7';
+    bg = '#f0f9ff';
+    border = '#7dd3fc';
+  } else if (status === 'Pending Assistant Secretary Review') {
+    step = 4;
+    percent = 44;
+    stepId = 'assistant_secretary';
+    titleEn = 'Assistant Secretary Review';
+    titleSi = 'සහකාර ලේකම් (පළමු පෙළ සමාලෝචනය)';
+    deskEn = 'Currently with Assistant Secretary for 1st tier ministry review and observations.';
+    deskSi = 'පළමු පෙළ අමාත්‍යාංශ සමාලෝචනය හා නිරීක්ෂණ සඳහා සහකාර ලේකම් වෙත යොමු කර ඇත.';
+    nextDeskEn = 'Senior Assistant Secretary';
+    nextDeskSi = 'ජ්‍යෙෂ්ඨ සහකාර ලේකම්';
+    color = '#2563eb';
+    bg = '#eff6ff';
+    border = '#93c5fd';
+  } else if (status === 'Pending Review') {
+    step = 3;
+    percent = 33;
+    stepId = 'subject_officer';
+    titleEn = 'Subject Officer (Assessment & Note Sheet)';
+    titleSi = 'විෂයභාර නිලධාරී (නිවාඩු වර්ගීකරණය හා අවසර පත්‍රිකාව)';
+    deskEn = 'Currently with Subject Officer to verify leave balance, prepare For Office Use Only particulars and Note Sheet (අවසර පත්‍රිකාව).';
+    deskSi = 'නිවාඩු ශේෂය පරීක්ෂා කර "For Office Use Only" විස්තර හා අවසර පත්‍රිකාව (Note Sheet) සැකසීම සඳහා විෂයභාර නිලධාරී වෙත යොමු කර ඇත.';
+    nextDeskEn = 'Assistant Secretary';
+    nextDeskSi = 'සහකාර ලේකම්';
+    color = '#d97706';
+    bg = '#fffbeb';
+    border = '#fde68a';
+  } else if (status === 'Pending Department Head Approval') {
+    step = 2;
+    percent = 22;
+    stepId = 'department_head';
+    titleEn = 'Head of Department Endorsement';
+    titleSi = 'දෙපාර්තමේන්තු ප්‍රධානී (ආයතනික නිර්දේශය)';
+    deskEn = 'Currently with Head of Department for institutional endorsement under Establishments Code Chapter XV Section 10:1.';
+    deskSi = 'ආයතන සංග්‍රහයේ XV පරිච්ඡේදයේ 10:1 වගන්තිය අනුව දෙපාර්තමේන්තු ප්‍රධානියාගේ ආයතනික නිර්දේශය ලබා ගැනීම සඳහා යොමු කර ඇත.';
+    nextDeskEn = 'Subject Officer (Leave Entitlement Assessment)';
+    nextDeskSi = 'විෂයභාර නිලධාරී (නිවාඩු වර්ගීකරණය)';
+    color = '#ea580c';
+    bg = '#fff7ed';
+    border = '#fed7aa';
+  }
+
+  return {
+    step,
+    total: 9,
+    percent,
+    stepId,
+    title: language === 'si' ? titleSi : titleEn,
+    titleEn,
+    titleSi,
+    desk: language === 'si' ? deskSi : deskEn,
+    deskEn,
+    deskSi,
+    nextDesk: language === 'si' ? nextDeskSi : nextDeskEn,
+    nextDeskEn,
+    nextDeskSi,
+    color,
+    bg,
+    border,
+    isApproved,
+    isRejected,
+    isCompleted: isApproved || isRejected,
+    statusText: language === 'si'
+      ? (isApproved ? 'අනුමතයි' : isRejected ? 'අනුමත නැත' : `පියවර ${step}/9: ක්‍රියාත්මකයි`)
+      : (isApproved ? 'Approved' : isRejected ? 'Not Approved' : `Step ${step}/9: In Progress`)
+  };
+}
+
+// =========================================================================
+// LIVE APPLICATION PROCESS TRACKER FOR APPLICANTS
+// Displays immediately when applicant submits or logs in
+// =========================================================================
+export function ApplicantLiveProcessTracker({
+  request,
+  language = 'en',
+  onOpenDetail,
+  allRequests = [],
+  selectedRequestId,
+  onSelectRequestId,
+  onNewRequest,
+  onEditRequest,
+  onDeleteRequest,
+  onRejectRequest,
+  user,
+  token
+}) {
+  if (!request && (!allRequests || allRequests.length === 0)) {
+    return (
+      <div style={{
+        background: '#ffffff',
+        border: '1.5px dashed #93c5fd',
+        borderRadius: '12px',
+        padding: '24px 20px',
+        marginBottom: '24px',
+        boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)',
+        textAlign: 'center'
+      }}>
+        <div style={{
+          width: '48px',
+          height: '48px',
+          borderRadius: '50%',
+          background: '#eff6ff',
+          color: '#2563eb',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: '10px'
+        }}>
+          <Scale size={24} />
+        </div>
+        <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', margin: '0 0 6px 0' }}>
+          {language === 'si' ? 'සජීවී අයදුම්පත් ක්‍රියාවලි නිරීක්ෂකය (Live Application Process Tracker)' : 'Live Application Process Tracker'}
+        </h3>
+        <p style={{ fontSize: '12.5px', color: '#64748b', maxWidth: '560px', margin: '0 auto 16px auto', lineHeight: 1.5 }}>
+          {language === 'si'
+            ? 'ඔබ විදේශ නිවාඩු අයදුම්පතක් ඉදිරිපත් කළ පසු, පියවර 9කින් යුත් නිල අනුමත ධුරාවලිය ඔස්සේ එහි සජීවී ප්‍රගතිය මෙතැනින් නැරඹිය හැක.'
+            : 'Once you submit a foreign leave application, its real-time progress across all 9 hierarchy stages will appear here.'}
+        </p>
+        {onNewRequest && (
+          <button
+            type="button"
+            className="primary-button"
+            onClick={onNewRequest}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', margin: '0 auto' }}
+          >
+            <Plus size={15} />
+            <span>{language === 'si' ? 'නව නිවාඩු අයදුම්පතක් ඉදිරිපත් කරන්න' : 'Submit New Leave Application'}</span>
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Active request to track
+  const activeReq = request || (allRequests && allRequests.length > 0 ? allRequests[0] : null);
+  if (!activeReq) return null;
+
+  const info = getHierarchyStatusInfo(activeReq, language);
+  const d = activeReq.details || (activeReq.applicant_name ? activeReq : {});
+  const isOfficial = activeReq.leave_type === 'Official duty' || d.leaveType === 'Official duty' || d.leaveCategory === 'Official duty';
+
+  return (
+    <div style={{
+      background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+      border: `1.5px solid ${info.isApproved ? '#86efac' : info.isRejected ? '#fca5a5' : '#bfdbfe'}`,
+      borderRadius: '12px',
+      padding: '20px 22px',
+      marginBottom: '24px',
+      boxShadow: '0 4px 14px rgba(15, 23, 42, 0.06)',
+      position: 'relative'
+    }}>
+      {/* Top Banner Row: Brand / Tracker Title + Application Switcher */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '28px',
+              height: '28px',
+              borderRadius: '7px',
+              background: info.bg,
+              color: info.color,
+              border: `1px solid ${info.border}`
+            }}>
+              <Scale size={16} />
+            </span>
+            <div>
+              <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span>{language === 'si' ? 'සජීවී අයදුම්පත් ක්‍රියාවලි තත්ත්වය' : 'Live Application Process Tracker'}</span>
+                <span style={{
+                  fontSize: '10.5px',
+                  fontWeight: 700,
+                  color: info.color,
+                  background: info.bg,
+                  border: `1px solid ${info.border}`,
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <span style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: info.color,
+                    display: 'inline-block'
+                  }} />
+                  {info.statusText}
+                </span>
+              </h3>
+              <p style={{ fontSize: '11.5px', color: '#64748b', margin: '2px 0 0 0' }}>
+                {language === 'si'
+                  ? 'නිල අනුමත ධුරාවලිය ඔස්සේ ඔබේ අයදුම්පතේ වත්මන් පියවර සහ ඉදිරි අදියර සජීවීව නිරීක්ෂණය කරන්න'
+                  : 'Track your application status through the official 9-stage approval hierarchy'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Right side: Application Switcher if multiple applications */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {allRequests && allRequests.length > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: '#475569' }}>
+                {language === 'si' ? 'අයදුම්පත තෝරන්න:' : 'Select Application:'}
+              </span>
+              <select
+                value={activeReq.id}
+                onChange={(e) => onSelectRequestId && onSelectRequestId(Number(e.target.value))}
+                style={{
+                  fontSize: '11.5px',
+                  fontWeight: 600,
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  border: '1.5px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  cursor: 'pointer'
+                }}
+              >
+                {allRequests.map((r) => {
+                  const rInfo = getHierarchyStatusInfo(r, language);
+                  return (
+                    <option key={r.id} value={r.id}>
+                      FV-{String(r.id).padStart(4, '0')} · {r.destination} ({language === 'si' ? `පියවර ${rInfo.step}/9` : `Step ${rInfo.step}/9`})
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          )}
+
+          {onOpenDetail && (
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => onOpenDetail(activeReq)}
+              style={{
+                height: '32px',
+                padding: '0 12px',
+                fontSize: '11px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderRadius: '6px'
+              }}
+            >
+              <span>{language === 'si' ? 'සම්පූර්ණ විස්තර බලන්න' : 'View Full Details'}</span>
+              <ArrowRight size={13} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Highlights Bar */}
+      <div style={{
+        background: '#ffffff',
+        border: '1px solid #e2e8f0',
+        borderRadius: '8px',
+        padding: '12px 14px',
+        marginBottom: '16px',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+        gap: '12px',
+        alignItems: 'center'
+      }}>
+        <div>
+          <span style={{ display: 'block', fontSize: '10px', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700 }}>
+            {language === 'si' ? 'අයදුම්පත් අංකය' : 'Application Ref'}
+          </span>
+          <strong style={{ fontSize: '14px', color: '#1e40af' }}>
+            FV-{String(activeReq.id).padStart(4, '0')}
+          </strong>
+        </div>
+
+        <div>
+          <span style={{ display: 'block', fontSize: '10px', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700 }}>
+            {language === 'si' ? 'ගමනාන්තය' : 'Destination'}
+          </span>
+          <strong style={{ fontSize: '13px', color: '#0f172a' }}>
+            ✈️ {activeReq.destination}
+          </strong>
+        </div>
+
+        <div>
+          <span style={{ display: 'block', fontSize: '10px', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700 }}>
+            {language === 'si' ? 'දිනයන්' : 'Travel Dates'}
+          </span>
+          <strong style={{ fontSize: '12px', color: '#334155' }}>
+            {activeReq.start_date} → {activeReq.end_date}
+          </strong>
+        </div>
+
+        <div>
+          <span style={{ display: 'block', fontSize: '10px', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700 }}>
+            {language === 'si' ? 'නිවාඩු වර්ගය' : 'Leave Category'}
+          </span>
+          <span className={`modal-leave-tag ${isOfficial ? 'official' : 'personal'}`} style={{ fontSize: '10px', padding: '2px 8px' }}>
+            {isOfficial
+              ? (language === 'si' ? '🏛️ නිල සංචාරය' : '🏛️ Official Duty')
+              : (language === 'si' ? '✈️ පෞද්ගලික නිවාඩු' : '✈️ Personal Leave')}
+          </span>
+        </div>
+
+        {/* Progress Percent */}
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+            <span style={{ fontSize: '10px', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700 }}>
+              {language === 'si' ? 'සමස්ත ප්‍රගතිය' : 'Overall Progress'}
+            </span>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: info.color }}>
+              {info.percent}%
+            </span>
+          </div>
+          <div style={{
+            height: '8px',
+            background: '#e2e8f0',
+            borderRadius: '4px',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              width: `${info.percent}%`,
+              height: '100%',
+              background: info.isApproved
+                ? 'linear-gradient(90deg, #16a34a, #22c55e)'
+                : info.isRejected
+                ? '#dc2626'
+                : 'linear-gradient(90deg, #2563eb, #3b82f6)',
+              borderRadius: '4px',
+              transition: 'width 0.4s ease'
+            }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Current Stage Desk Box */}
+      <div style={{
+        background: info.bg,
+        border: `1.5px solid ${info.border}`,
+        borderRadius: '8px',
+        padding: '12px 16px',
+        marginBottom: '16px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '12px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '38px',
+            height: '38px',
+            borderRadius: '50%',
+            background: info.color,
+            color: '#ffffff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '14px',
+            fontWeight: 800,
+            flexShrink: 0
+          }}>
+            {info.isApproved ? '✓' : info.isRejected ? '✕' : `${info.step}/9`}
+          </div>
+          <div>
+            <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 800, color: info.color }}>
+              {language === 'si' ? `පියවර ${info.step} / 9 · වත්මන් ක්‍රියාවලි අදියර` : `Step ${info.step} of 9 · Current Workflow Stage`}
+            </div>
+            <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
+              {info.title}
+            </div>
+            <div style={{ fontSize: '12px', color: '#334155', marginTop: '3px', lineHeight: 1.4 }}>
+              {info.desk}
+            </div>
+          </div>
+        </div>
+
+        {!info.isCompleted && (
+          <div style={{
+            background: '#ffffff',
+            border: `1px solid ${info.border}`,
+            borderRadius: '6px',
+            padding: '6px 12px',
+            fontSize: '11px',
+            color: '#475569'
+          }}>
+            <span style={{ fontWeight: 700, color: '#0f172a' }}>
+              {language === 'si' ? 'ඊළඟ පියවර: ' : 'Next Stage: '}
+            </span>
+            <span>➔ {info.nextDesk}</span>
+          </div>
+        )}
+      </div>
+
+      {/* The 9-Stage Stepper Track */}
+      <WorkflowHierarchyStepper request={activeReq} language={language} />
+
+      {/* Bottom Download Actions */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '8px',
+        paddingTop: '8px',
+        borderTop: '1px solid #f1f5f9'
+      }}>
+        {/* Download ZIP Package Button (All 7 Documents) */}
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={() => downloadApplicationZip(activeReq, token)}
+          title={language === 'si' ? `සම්පූර්ණ ලේඛන 7ම අඩංගු ZIP ගොනුව බාගන්න (FV-${String(activeReq.id).padStart(4, '0')}.zip)` : `Download Complete 7-Document ZIP Package (FV-${String(activeReq.id).padStart(4, '0')}.zip)`}
+          style={{
+            height: '30px',
+            padding: '0 10px',
+            fontSize: '11px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px',
+            borderColor: '#3b82f6',
+            background: '#eff6ff',
+            color: '#1d4ed8',
+            fontWeight: 700
+          }}
+        >
+          <FolderArchive size={13} />
+          <span>{language === 'si' ? `ZIP බාගන්න (FV-${String(activeReq.id).padStart(4, '0')}.zip)` : `Download ZIP (FV-${String(activeReq.id).padStart(4, '0')}.zip)`}</span>
+        </button>
+
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={() => printGeneral126Pdf(activeReq)}
+          style={{ height: '30px', padding: '0 10px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+        >
+          <FileDown size={13} />
+          <span>{language === 'si' ? 'General 126 PDF' : 'General 126 PDF'}</span>
+        </button>
+
+        {d.departmentHeadEndorsement && (
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => printDepartmentHeadLetterPdf(activeReq)}
+            style={{ height: '30px', padding: '0 10px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+          >
+            <FileDown size={13} />
+            <span>{language === 'si' ? 'දෙපාර්තමේන්තු ප්‍රධානී ලිපිය PDF' : 'Dept Head Letter PDF'}</span>
+          </button>
+        )}
+
+        {(d.officerCompleted || d.officerAssessment) && (
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => printOfficeUseOnlyPdf(activeReq)}
+            style={{ height: '30px', padding: '0 10px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+          >
+            <FileDown size={13} />
+            <span>{language === 'si' ? 'නිවාඩු විස්තර (Office Use) PDF' : 'Leave Particulars PDF'}</span>
+          </button>
+        )}
+
+        {(d.secretaryApproval || activeReq.status === 'Approved') && (
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => printSecretaryApprovalLetterPdf(activeReq)}
+            style={{
+              height: '30px',
+              padding: '0 10px',
+              fontSize: '11px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              borderColor: '#86efac',
+              background: '#f0fdf4',
+              color: '#15803d',
+              fontWeight: 700
+            }}
+          >
+            <FileDown size={13} />
+            <span>{language === 'si' ? 'අනුමත ලිපිය PDF (Approval Letter)' : 'Approval Letter PDF'}</span>
+          </button>
+        )}
+
+        {/* Edit Button */}
+        {(user?.role === 'admin' || ((user?.id === activeReq.applicant_id || user?.role === 'applicant') && ['Pending Department Head Approval', 'Pending Review', 'Returned'].includes(activeReq.status))) && onEditRequest && (
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => onEditRequest(activeReq)}
+            style={{
+              height: '30px',
+              padding: '0 10px',
+              fontSize: '11px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              borderColor: '#93c5fd',
+              background: '#eff6ff',
+              color: '#1d4ed8',
+              fontWeight: 600
+            }}
+          >
+            <Edit3 size={13} />
+            <span>{language === 'si' ? 'සංස්කරණය (Edit)' : 'Edit'}</span>
+          </button>
+        )}
+
+        {/* Delete Button */}
+        {(user?.role === 'admin' || ((user?.id === activeReq.applicant_id || user?.role === 'applicant') && ['Pending Department Head Approval', 'Pending Review', 'Returned'].includes(activeReq.status))) && onDeleteRequest && (
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => onDeleteRequest(activeReq)}
+            style={{
+              height: '30px',
+              padding: '0 10px',
+              fontSize: '11px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              borderColor: '#fca5a5',
+              background: '#fef2f2',
+              color: '#dc2626',
+              fontWeight: 600
+            }}
+          >
+            <Trash2 size={13} />
+            <span>{language === 'si' ? 'මකා දමන්න (Delete)' : 'Delete'}</span>
+          </button>
+        )}
+
+        {/* Reject Button (for Reviewers / Authorities / Admin) */}
+        {!['Approved', 'Rejected'].includes(activeReq.status) && ['department_head', 'reviewer', 'assistant_secretary', 'senior_assistant_secretary', 'additional_secretary', 'secretary', 'authorized_official', 'minister', 'president', 'admin'].includes(user?.role) && onRejectRequest && (
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => onRejectRequest(activeReq)}
+            style={{
+              height: '30px',
+              padding: '0 10px',
+              fontSize: '11px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              borderColor: '#fca5a5',
+              background: '#fee2e2',
+              color: '#b91c1c',
+              fontWeight: 700
+            }}
+          >
+            <AlertCircle size={13} />
+            <span>{language === 'si' ? 'ප්‍රතික්ෂේප කරන්න (Reject)' : 'Reject'}</span>
+          </button>
+        )}
+
+        {onOpenDetail && (
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => onOpenDetail(activeReq)}
+            style={{ height: '30px', padding: '0 10px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+          >
+            <Eye size={13} />
+            <span>{language === 'si' ? 'විස්තර බලන්න' : 'View Details'}</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// =========================================================================
+// DELETE CONFIRMATION MODAL
+// =========================================================================
+export function DeleteConfirmModal({
+  request,
+  language = 'en',
+  token,
+  onClose,
+  onDeleted
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  if (!request) return null;
+
+  async function handleDelete() {
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/requests/${request.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete request.');
+      onDeleted?.(request);
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to delete request.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={{
+        background: '#ffffff',
+        borderRadius: '12px',
+        width: 'min(460px, 94%)',
+        padding: '24px',
+        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+        border: '1.5px solid #fee2e2'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
+          <div style={{
+            width: '44px',
+            height: '44px',
+            borderRadius: '50%',
+            background: '#fee2e2',
+            color: '#dc2626',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <Trash2 size={22} />
+          </div>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
+              {language === 'si' ? 'අයදුම්පත මකා දැමීම (Delete Application)' : 'Delete Application'}
+            </h3>
+            <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 700 }}>
+              FV-{String(request.id).padStart(4, '0')} · {request.destination}
+            </span>
+          </div>
+        </div>
+
+        <p style={{ fontSize: '13px', color: '#475569', lineHeight: 1.5, margin: '0 0 16px 0' }}>
+          {language === 'si'
+            ? `FV-${String(request.id).padStart(4, '0')} අංකැති ${request.destination} සංචාරක නිවාඩු අයදුම්පත සැබවින්ම මකා දැමීමට ඔබට අවශ්‍යද? මෙම ක්‍රියාව ආපසු හැරවිය නොහැකි අතර සියලු අනුමැති වාර්තාද මකා දැමෙනු ඇත.`
+            : `Are you sure you want to permanently delete application FV-${String(request.id).padStart(4, '0')} for ${request.destination}? This action cannot be undone.`}
+        </p>
+
+        {error && (
+          <div style={{
+            background: '#fef2f2',
+            border: '1px solid #fca5a5',
+            color: '#b91c1c',
+            borderRadius: '6px',
+            padding: '8px 12px',
+            fontSize: '11.5px',
+            marginBottom: '14px'
+          }}>
+            {error}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={onClose}
+            disabled={busy}
+            style={{ height: '34px', padding: '0 14px', fontSize: '11px' }}
+          >
+            {language === 'si' ? 'අවලංගු කරන්න' : 'Cancel'}
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={busy}
+            style={{
+              height: '34px',
+              padding: '0 16px',
+              fontSize: '11px',
+              fontWeight: 700,
+              background: '#dc2626',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: busy ? 'not-allowed' : 'pointer'
+            }}
+          >
+            <Trash2 size={14} />
+            <span>{busy ? (language === 'si' ? 'මකා දමමින්...' : 'Deleting...') : (language === 'si' ? 'ඔව්, මකා දමන්න' : 'Yes, Delete')}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =========================================================================
+// REJECT APPLICATION MODAL
+// =========================================================================
+export function RejectRequestModal({
+  request,
+  language = 'en',
+  user,
+  token,
+  onClose,
+  onRejected
+}) {
+  const [reason, setReason] = useState('');
+  const [signature, setSignature] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  if (!request) return null;
+
+  async function handleReject(e) {
+    e.preventDefault();
+    if (!reason.trim()) {
+      setError(language === 'si' ? 'කරුණාකර ප්‍රතික්ෂේප කිරීමට හේතුව හෝ නිරීක්ෂණ සටහන් කරන්න.' : 'Please provide the rejection reason or remarks.');
+      return;
+    }
+    if (!signature) {
+      setError(language === 'si' ? 'කරුණාකර ඔබගේ ඩිජිටල් අත්සන තබන්න.' : 'Please add your digital signature to authorize rejection.');
+      return;
+    }
+
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/requests/${request.id}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ reason: reason.trim(), signature })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to reject application.');
+      onRejected?.(request);
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to reject application.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={{
+        background: '#ffffff',
+        borderRadius: '12px',
+        width: 'min(540px, 94%)',
+        maxHeight: '90vh',
+        overflowY: 'auto',
+        padding: '24px',
+        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+        border: '1.5px solid #fca5a5'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '50%',
+              background: '#fee2e2',
+              color: '#b91c1c',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              <AlertCircle size={22} />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
+                {language === 'si' ? 'අයදුම්පත ප්‍රතික්ෂේප කිරීම (Reject Leave)' : 'Reject Leave Application'}
+              </h3>
+              <span style={{ fontSize: '11px', color: '#64748b' }}>
+                FV-{String(request.id).padStart(4, '0')} · {request.applicant_name} ({request.destination})
+              </span>
+            </div>
+          </div>
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Close">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div style={{
+          background: '#fff1f2',
+          border: '1px solid #fecdd3',
+          borderRadius: '8px',
+          padding: '10px 12px',
+          marginBottom: '16px',
+          fontSize: '11.5px',
+          color: '#9f1239',
+          lineHeight: 1.4
+        }}>
+          <strong>{language === 'si' ? 'අවධානයට:' : 'Notice:'}</strong>{' '}
+          {language === 'si'
+            ? 'මෙම අයදුම්පත ප්‍රතික්ෂේප කළ පසු එහි නිල තත්ත්වය "Rejected" (පියවර 9/9: නිවාඩු අනුමත නැත) ලෙස සටහන් වන අතර අයදුම්කරු වෙත සටහන සමඟ දැනුම්දීමක් නිකුත් කෙරේ.'
+            : 'Rejecting this request will conclude the process as "Rejected" (Step 9/9: Leave is not approved) and notify the applicant.'}
+        </div>
+
+        <form onSubmit={handleReject}>
+          <div style={{ marginBottom: '14px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+              {language === 'si' ? 'ප්‍රතික්ෂේප කිරීමට හේතුව / නිරීක්ෂණ සටහන (Rejection Remarks) *' : 'Rejection Reason / Observations *'}
+            </label>
+            <textarea
+              required
+              rows={3}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder={language === 'si' ? 'නිවාඩු අනුමත නොකිරීමට හේතු පැහැදිලිව සටහන් කරන්න...' : 'State clear reasons for rejection...'}
+              style={{
+                width: '100%',
+                padding: '8px 10px',
+                borderRadius: '6px',
+                border: '1.5px solid #cbd5e1',
+                fontSize: '12px',
+                boxSizing: 'border-box',
+                fontFamily: 'inherit'
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+              {language === 'si' ? `බලධාරියාගේ අත්සන (${user?.name || 'Reviewing Officer'}) *` : `Digital Signature of Authority (${user?.name || 'Reviewing Officer'}) *`}
+            </label>
+            <SignaturePad
+              signature={signature}
+              onSave={setSignature}
+              onClear={() => setSignature('')}
+              labels={{
+                title: language === 'si' ? 'ඩිජිටල් අත්සන' : 'Digital Signature',
+                description: language === 'si' ? 'ප්‍රතික්ෂේප කිරීම තහවුරු කිරීමට මෙහි අත්සන් කරන්න' : 'Sign here to authenticate decision',
+                clear: language === 'si' ? 'මකන්න' : 'Clear',
+                save: language === 'si' ? 'තහවුරු කරන්න' : 'Save',
+                statusSaved: language === 'si' ? 'අත්සන් තබා ඇත' : 'Signed',
+              }}
+            />
+          </div>
+
+          {error && (
+            <div style={{
+              background: '#fef2f2',
+              border: '1px solid #fca5a5',
+              color: '#b91c1c',
+              borderRadius: '6px',
+              padding: '8px 12px',
+              fontSize: '11.5px',
+              marginBottom: '14px'
+            }}>
+              {error}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={onClose}
+              disabled={busy}
+              style={{ height: '34px', padding: '0 14px', fontSize: '11px' }}
+            >
+              {language === 'si' ? 'අවලංගු කරන්න' : 'Cancel'}
+            </button>
+            <button
+              type="submit"
+              disabled={busy}
+              style={{
+                height: '34px',
+                padding: '0 16px',
+                fontSize: '11px',
+                fontWeight: 700,
+                background: '#dc2626',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                cursor: busy ? 'not-allowed' : 'pointer'
+              }}
+            >
+              <AlertCircle size={14} />
+              <span>{busy ? (language === 'si' ? 'ප්‍රතික්ෂේප කරමින්...' : 'Rejecting...') : (language === 'si' ? 'ප්‍රතික්ෂේප කිරීම තහවුරු කරන්න' : 'Confirm Rejection')}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 
@@ -2014,6 +3456,7 @@ export function RequestDetails({ details = {}, language, request, onPrintOfficer
 
   return (
     <div className="request-review-details">
+      <WorkflowHierarchyStepper request={request || { details }} language={language} />
       <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
         <span className={`modal-leave-tag ${isOfficial ? 'official' : 'personal'}`}>
           {isOfficial
@@ -3968,35 +5411,60 @@ export function printDepartmentHeadLetterPdf(r) {
 
   const d = r.details || (r.applicant_name ? r : {});
   const endorsement = d.departmentHeadEndorsement || {};
-  const refNo = endorsement.myNo || d.deptRefNo || (r.id ? `${(r.department_name || d.department || 'DEPT').slice(0, 4).toUpperCase()}/LV/${new Date().getFullYear()}/FV-${String(r.id).padStart(4, '0')}` : '...........................');
-  const ministryName = endorsement.ministryName || d.ministry || 'Civil Security';
-  const applicantName = r.applicant_name || d.applicantName || d.fullName || '........................................................................';
-  const salutation = endorsement.officerSalutation || 'Mr/Mrs/Miss';
+  const departmentName = r.department_name || d.department || endorsement.completedBy?.department || 'Sri Lanka Telecom and its Subsidiaries and Allied Institutions';
+
+  const rawMinistry = endorsement.ministryName || d.ministry || 'Technology';
+  const cleanMinistryName = rawMinistry.replace(/^(ministry\s+of\s+|අමාත්‍යාංශය\s*)/i, '').trim() || rawMinistry;
+
+  let rawApplicantName = r.applicant_name || d.applicantName || d.fullName || '........................................................................';
+  let activeSalutation = endorsement.officerSalutation || 'Mr.';
+  const prefixMatch = rawApplicantName.match(/^(Mr\.|Mrs\.|Miss|Ms\.|Dr\.|Prof\.|Eng\.|Rev\.)\s*/i);
+  if (prefixMatch) {
+    activeSalutation = prefixMatch[1];
+    rawApplicantName = rawApplicantName.slice(prefixMatch[0].length).trim();
+  }
+
+  const refNo = endorsement.myNo || d.deptRefNo || (r.id ? `${(r.department_name || d.department || 'SLT').slice(0, 4).toUpperCase()}/LV/${new Date().getFullYear()}/FV-${String(r.id).padStart(4, '0')}` : '...........................');
   const recommendation = endorsement.recommendation || (r.status !== 'Pending Department Head Approval' ? 'recommended' : '');
   const pmPermission = endorsement.primeMinisterPermission || 'obtained';
   const date = endorsement.date || (r.status !== 'Pending Department Head Approval' ? r.created_at?.slice(0, 10) : '...........................');
   const signature = endorsement.signature;
   const headName = endorsement.completedBy?.name || d.forwardedDepartment?.headName || (r.status !== 'Pending Department Head Approval' ? 'Head of Department' : '');
   const headDesignation = endorsement.completedBy?.designation || d.forwardedDepartment?.headDesignation || 'Head of Department / Institution';
-  const departmentName = r.department_name || d.department || endorsement.completedBy?.department || 'Ministry of Civil Security';
   const remarks = endorsement.remarks || '';
+
+  // Secretary data
+  const clearances = Array.isArray(d.secretariatClearances) ? d.secretariatClearances : [];
+  const secretaryClearance = clearances.find(c => c.role === 'secretary' || c.decision === 'approve') || d.secretaryApproval || (r.status === 'Approved' ? {
+    userName: 'වරුෂණ ශ්‍රී ධනපාල (Varushana Sri Dhanapala)',
+    userDesignation: 'ලේකම් (Secretary)',
+    ministryName: cleanMinistryName,
+    date: r.updated_at?.slice(0, 10) || ''
+  } : null);
+
+  const secRefNo = secretaryClearance?.myNo || (r.id ? `${cleanMinistryName.slice(0, 3).toUpperCase()}/SEC/${new Date().getFullYear()}/FV-${String(r.id).padStart(4, '0')}` : '...........................');
+  const secName = secretaryClearance?.userName || secretaryClearance?.signatoryName || (r.status === 'Approved' ? 'වරුෂණ ශ්‍රී ධනපාල (Varushana Sri Dhanapala)' : '');
+  const secSignature = secretaryClearance?.signature;
+  const secDate = secretaryClearance?.date || secretaryClearance?.timestamp?.slice(0, 10) || (r.status === 'Approved' ? r.updated_at?.slice(0, 10) : '...........................');
+  const isSecretaryApproved = r.status === 'Approved' || r.status === 'Pending Presidential Approval' || secretaryClearance?.decision === 'approve';
+  const isSecretaryRejected = r.status === 'Rejected' || secretaryClearance?.decision === 'reject';
 
   printWin.document.write(`
     <!DOCTYPE html>
     <html>
       <head>
         <meta charset="utf-8" />
-        <title>Head of Department Letter - ${refNo} - ${applicantName}</title>
+        <title>Head of Department & Secretary Letter - ${refNo} - ${rawApplicantName}</title>
         <style>
           * { box-sizing: border-box; }
           body {
             font-family: "Times New Roman", Times, Georgia, serif;
             color: #0f172a;
-            background: #f8fafc;
+            background: #f1f5f9;
             margin: 0;
             padding: 24px;
-            line-height: 1.6;
             font-size: 15px;
+            line-height: 1.6;
           }
           .no-print-toolbar {
             position: sticky;
@@ -4004,155 +5472,199 @@ export function printDepartmentHeadLetterPdf(r) {
             z-index: 100;
             background: #1e1b4b;
             color: #ffffff;
-            padding: 10px 18px;
+            padding: 12px 20px;
             border-radius: 8px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            margin: 0 auto 24px;
+            max-width: 210mm;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             font-size: 12px;
           }
-          .page-container {
-            max-width: 780px;
-            margin: 0 auto;
+          .toolbar-btn {
+            border: none;
+            padding: 7px 14px;
+            border-radius: 5px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 11.5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+          }
+          .btn-primary { background: #2563eb; color: #ffffff; }
+          .btn-primary:hover { background: #1d4ed8; }
+          .btn-secondary { background: #334155; color: #ffffff; }
+          .btn-secondary:hover { background: #475569; }
+
+          .sheet-page {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto 30px;
             background: #ffffff;
-            padding: 55px 65px;
-            box-shadow: 0 1px 10px rgba(0, 0, 0, 0.08);
-            border: 1px solid #e2e8f0;
-            min-height: 960px;
+            padding: 24mm 22mm;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
             position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+          }
+          .sheet-content {
+            flex: 1;
           }
 
-          /* Government Letterhead */
-          .gov-letterhead {
+          /* Official Government Letterhead */
+          .official-letterhead {
             text-align: center;
-            border-bottom: 2px solid #000000;
-            padding-bottom: 12px;
             margin-bottom: 26px;
+            padding-bottom: 14px;
+            border-bottom: 1.5px solid #0f172a;
           }
-          .gov-letterhead .republic {
-            font-size: 12px;
-            font-weight: bold;
+          .republic-title-si {
+            font-size: 13.5px;
+            font-weight: 700;
+            color: #0f172a;
             letter-spacing: 0.5px;
-            text-transform: uppercase;
           }
-          .gov-letterhead .republic-si {
+          .republic-title-en {
             font-size: 11px;
-            color: #475569;
+            font-weight: 700;
+            color: #334155;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
             margin-top: 2px;
           }
-          .gov-letterhead .dept {
-            font-size: 16px;
-            font-weight: bold;
-            margin: 6px 0 2px;
-            text-transform: uppercase;
+          .department-name {
+            font-size: 17px;
+            font-weight: 800;
+            color: #091e42;
+            margin-top: 6px;
+            letter-spacing: 0.3px;
           }
-          .gov-letterhead .sub-rule {
+          .circular-badge {
             font-size: 11px;
+            color: #475569;
             font-style: italic;
-            color: #475569;
-            margin-top: 2px;
+            margin-top: 4px;
           }
 
-          /* Right-aligned My No. */
-          .ref-right-block {
+          /* Ref & Addressee */
+          .top-ref-row {
             text-align: right;
-            margin-bottom: 28px;
             font-size: 15px;
-          }
-          .ref-dotted {
-            display: inline-block;
-            border-bottom: 1px dotted #000;
-            min-width: 170px;
-            text-align: left;
-            padding: 0 6px;
-            font-weight: bold;
-          }
-
-          /* Left-aligned Addressee */
-          .addressee-block {
-            text-align: left;
-            margin-bottom: 34px;
-            font-size: 15px;
-            line-height: 1.5;
-          }
-
-          /* Numbered Clauses */
-          .letter-clause {
             margin-bottom: 24px;
-            text-align: justify;
-            text-justify: inter-word;
+          }
+          .dotted-fill {
+            display: inline-block;
+            border-bottom: 1.2px dotted #0f172a;
+            padding: 0 8px;
+            font-weight: 700;
+            min-width: 180px;
+            text-align: left;
+          }
+          .addressee {
+            font-size: 15.5px;
+            line-height: 1.5;
+            margin-bottom: 30px;
+          }
+
+          /* Clauses */
+          .clause-row {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 22px;
             font-size: 15px;
             line-height: 1.75;
+            text-align: justify;
+            text-justify: inter-word;
           }
           .clause-num {
-            display: inline-block;
-            width: 22px;
-            font-weight: bold;
+            width: 26px;
+            font-weight: 700;
+            font-size: 15.5px;
+            flex-shrink: 0;
           }
-          .applicant-fill {
-            border-bottom: 1px dotted #000;
+          .clause-body {
+            flex: 1;
+          }
+          .applicant-line {
+            border-bottom: 1.2px dotted #0f172a;
             padding: 0 6px;
-            font-weight: bold;
+            font-weight: 700;
           }
           .rec-highlight {
-            font-weight: bold;
+            font-weight: 700;
             text-decoration: underline;
+            color: #15803d;
+            font-size: 15.5px;
           }
-          .rec-strikethrough {
+          .rec-muted {
             text-decoration: line-through;
             color: #94a3b8;
           }
 
-          .remarks-box {
-            margin: 10px 0 20px 22px;
-            padding: 8px 12px;
+          .observations-box {
+            margin: 12px 0 24px 26px;
+            padding: 8px 14px;
             background: #f8fafc;
-            border-left: 3px solid #7c3aed;
+            border-left: 3px solid #2563eb;
             font-size: 13.5px;
             font-style: italic;
+            color: #334155;
           }
 
-          /* Footer: Date and Signature */
-          .letter-footer {
-            margin-top: 55px;
+          /* Footer */
+          .footer-row {
+            margin-top: 40px;
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
           }
-          .date-block {
-            font-size: 15px;
+          .date-col {
             width: 45%;
+            font-size: 15px;
           }
-          .signature-block {
-            text-align: center;
-            font-size: 14.5px;
-            line-height: 1.4;
+          .sig-col {
             width: 50%;
+            text-align: center;
           }
           .sig-img {
             max-height: 52px;
-            max-width: 200px;
+            max-width: 220px;
             display: block;
             margin: 0 auto 6px;
           }
-          .sig-dotted-line {
-            height: 42px;
-            border-bottom: 1px dotted #000;
-            width: 210px;
+          .sig-line {
+            border-bottom: 1.2px dotted #0f172a;
+            width: 240px;
             margin: 0 auto 6px;
+            height: 40px;
           }
-          .sig-title-block {
-            border-top: 1px dotted #000;
+          .sig-caption {
+            border-top: 1.2px dotted #0f172a;
             padding-top: 6px;
+            font-size: 14px;
+            line-height: 1.4;
+          }
+
+          .doc-footer-meta {
+            margin-top: 25px;
+            padding-top: 8px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #94a3b8;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
           }
 
           @media print {
             @page {
               size: A4 portrait;
-              margin: 15mm;
+              margin: 0;
             }
             body {
               background: #ffffff;
@@ -4161,98 +5673,420 @@ export function printDepartmentHeadLetterPdf(r) {
             .no-print-toolbar {
               display: none !important;
             }
-            .page-container {
-              border: none;
-              padding: 0;
-              box-shadow: none;
-              max-width: 100%;
+            .hide-on-print {
+              display: none !important;
             }
+            .sheet-page {
+              margin: 0;
+              box-shadow: none;
+              page-break-after: always;
+              height: 297mm;
+              max-height: 297mm;
+              padding: 22mm 20mm;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <!-- Top Interactive Toolbar -->
+        <div class="no-print-toolbar">
+          <div>
+            <strong>📄 Est. Code XV 10:1 Official Letters (ආයතන ප්‍රධානී හා ලේකම් ලිපි)</strong>
+            <span style="opacity: 0.8; margin-left: 10px;">Ref: ${refNo} · ${rawApplicantName}</span>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="toolbar-btn btn-primary" onclick="printAll()">
+              🖨️ සියල්ල මුද්‍රණය (Print Both)
+            </button>
+            <button class="toolbar-btn btn-secondary" onclick="printPart1Only()">
+              📄 1. ආයතන ප්‍රධානී ලිපිය (Part 1 Only)
+            </button>
+            <button class="toolbar-btn btn-secondary" onclick="printPart2Only()">
+              📄 2. ලේකම් ලිපිය (Part 2 Only)
+            </button>
+            <button class="toolbar-btn btn-secondary" onclick="window.close()">
+              ✕ වසන්න
+            </button>
+          </div>
+        </div>
+
+        <!-- PAGE 1: HEAD OF DEPARTMENT FORWARDING LETTER -->
+        <div class="sheet-page" id="page-part1">
+          <div class="sheet-content">
+            <div class="official-letterhead">
+              <div class="republic-title-si">ශ්‍රී ලංකා ප්‍රජාතාන්ත්‍රික සමාජවාදී ජනරජය</div>
+              <div class="republic-title-en">Democratic Socialist Republic of Sri Lanka</div>
+              <div class="department-name">${departmentName}</div>
+              <div class="circular-badge">Establishments Code Chapter XV Section 10:1 · Recommendation of Head of Department</div>
+            </div>
+
+            <div class="top-ref-row">
+              my no.} <span class="dotted-fill">${refNo}</span>
+            </div>
+
+            <div class="addressee">
+              The Secretary,<br />
+              Ministry of <u>${cleanMinistryName}</u>
+            </div>
+
+            <!-- Clause 1 -->
+            <div class="clause-row">
+              <div class="clause-num">1</div>
+              <div class="clause-body">
+                forward herewith two copies of the leave application of<br />
+                ${activeSalutation} <span class="applicant-line"><u>${rawApplicantName}</u></span>. I certify that
+                acting arrangement have been made and that there is no disciplinary
+                action pending or contemplated against this officer.
+              </div>
+            </div>
+
+            <!-- Clause 2 -->
+            <div class="clause-row">
+              <div class="clause-num">2</div>
+              <div class="clause-body">
+                Prime Minister’s permission has been obtained in terms of Chapter XV -10:1 of the Establishments code. ${pmPermission === 'obtained' ? '<strong style="color: #166534; font-size: 13.5px; margin-left: 6px;">(Obtained / ලබාගෙන ඇත)</strong>' : ''}
+              </div>
+            </div>
+
+            <!-- Clause 3 -->
+            <div class="clause-row">
+              <div class="clause-num">3</div>
+              <div class="clause-body">
+                Leave is ${
+                  recommendation === 'recommended'
+                    ? '<span class="rec-highlight">recommended</span> / <span class="rec-muted">not recommended</span>.'
+                    : recommendation === 'not_recommended'
+                    ? '<span class="rec-muted">recommended</span> / <span class="rec-highlight" style="color: #b91c1c;">not recommended</span>.'
+                    : 'recommended / not recommended.'
+                }
+              </div>
+            </div>
+
+            ${remarks ? `
+              <div class="observations-box">
+                <strong>Observations / Remarks:</strong> ${remarks}
+              </div>
+            ` : ''}
+
+            <!-- Footer Date & Signature -->
+            <div class="footer-row">
+              <div class="date-col">
+                Date} <span class="dotted-fill" style="min-width: 140px;">${date}</span>
+              </div>
+
+              <div class="sig-col">
+                ${signature ? `<img src="${signature}" class="sig-img" alt="Signature" />` : '<div class="sig-line"></div>'}
+                <div class="sig-caption">
+                  ${headName ? `<strong>${headName}</strong><br />` : ''}
+                  Signature and<br />
+                  Designation of Head of<br />
+                  Department<br />
+                  ${headDesignation ? `<span style="font-size: 12.5px; color: #334155;">${headDesignation}</span><br />` : ''}
+                  ${departmentName ? `<span style="font-size: 11.5px; color: #64748b;">${departmentName}</span>` : ''}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="doc-footer-meta">
+            <span>Establishments Code Chapter XV · Section 10:1 (Part I: Head of Department)</span>
+            <span>Ref: ${refNo} · Page 1 of 2</span>
+          </div>
+        </div>
+
+        <!-- PAGE 2: MINISTRY SECRETARY APPROVAL & DIRECTIVE -->
+        <div class="sheet-page" id="page-part2">
+          <div class="sheet-content">
+            <div class="official-letterhead">
+              <div class="republic-title-si">ශ්‍රී ලංකා ප්‍රජාතාන්ත්‍රික සමාජවාදී ජනරජය</div>
+              <div class="republic-title-en">Democratic Socialist Republic of Sri Lanka</div>
+              <div class="department-name">Ministry of ${cleanMinistryName}</div>
+              <div class="circular-badge">Establishments Code Chapter XV Section 10:1 · Ministerial Decision & Directive to Head of Department</div>
+            </div>
+
+            <div class="top-ref-row">
+              my no.} <span class="dotted-fill">${secRefNo}</span>
+            </div>
+
+            <div class="addressee" style="margin-bottom: 40px;">
+              <span class="dotted-fill" style="min-width: 320px; font-weight: normal;">${headName ? `${headName}, ${headDesignation}` : '......................................................................'}</span><br />
+              Head of Department,<br />
+              <span style="font-size: 13.5px; color: #475569;">${departmentName}</span>
+            </div>
+
+            <div style="text-align: center; margin: 50px 0 60px;">
+              <div style="border-bottom: 1.2px dotted #0f172a; width: 340px; margin: 0 auto 10px;"></div>
+              <div style="font-size: 18px; letter-spacing: 0.5px;">
+                Leave is ${
+                  isSecretaryApproved
+                    ? '<span class="rec-highlight" style="font-size: 19px;">approved</span> / <span class="rec-muted">not approved</span>'
+                    : isSecretaryRejected
+                    ? '<span class="rec-muted">approved</span> / <span class="rec-highlight" style="color: #b91c1c; font-size: 19px;">not approved</span>'
+                    : 'approved / not approved'
+                }
+              </div>
+            </div>
+
+            <div class="footer-row" style="margin-top: 50px;">
+              <div class="date-col">
+                <div>Date} <span class="dotted-fill" style="min-width: 140px;">${secDate}</span></div>
+                <div style="margin-top: 24px; font-size: 13px; color: #334155; font-style: italic;">
+                  copy to: Secretary to the Prime Minister.
+                </div>
+              </div>
+
+              <div class="sig-col">
+                ${secSignature ? `<img src="${secSignature}" class="sig-img" alt="Secretary Signature" />` : '<div class="sig-line"></div>'}
+                <div class="sig-caption">
+                  ${secName ? `<strong>${secName}</strong><br />` : ''}
+                  Secretary.<br />
+                  ministry of <span style="border-bottom: 1.2px dotted #0f172a; padding: 0 6px; font-weight: 700;">${cleanMinistryName}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="doc-footer-meta">
+            <span>Establishments Code Chapter XV · Section 10:1 (Part II: Ministry Secretary)</span>
+            <span>Ref: ${secRefNo} · Page 2 of 2</span>
+          </div>
+        </div>
+
+        <script>
+          function printAll() {
+            document.querySelectorAll('.sheet-page').forEach(function(el) { el.classList.remove('hide-on-print'); });
+            window.print();
+          }
+          function printPart1Only() {
+            document.getElementById('page-part1').classList.remove('hide-on-print');
+            document.getElementById('page-part2').classList.add('hide-on-print');
+            window.print();
+          }
+          function printPart2Only() {
+            document.getElementById('page-part1').classList.add('hide-on-print');
+            document.getElementById('page-part2').classList.remove('hide-on-print');
+            window.print();
+          }
+          window.onload = function() {
+            // Can be left ready for user print button
+          };
+        </script>
+      </body>
+    </html>
+  `);
+  printWin.document.close();
+}
+
+export const printHeadOfDepartmentLetterPdf = printDepartmentHeadLetterPdf;
+
+// =========================================================================
+// 5. STANDALONE MINISTRY SECRETARY APPROVAL LETTER PDF (Est. Code XV 10:1)
+// =========================================================================
+export function printSecretaryApprovalLetterPdf(r) {
+  if (!r) return;
+  const printWin = window.open('', '_blank');
+  if (!printWin) {
+    alert('Please allow popups in your browser to download/print the PDF.');
+    return;
+  }
+
+  const d = r.details || (r.applicant_name ? r : {});
+  const endorsement = d.departmentHeadEndorsement || {};
+  const departmentName = r.department_name || d.department || endorsement.completedBy?.department || 'Sri Lanka Telecom and its Subsidiaries and Allied Institutions';
+  const rawMinistry = endorsement.ministryName || d.ministry || 'Technology';
+  const cleanMinistryName = rawMinistry.replace(/^(ministry\s+of\s+|අමාත්‍යාංශය\s*)/i, '').trim() || rawMinistry;
+
+  const clearances = Array.isArray(d.secretariatClearances) ? d.secretariatClearances : [];
+  const secretaryClearance = clearances.find(c => c.role === 'secretary' || c.decision === 'approve') || d.secretaryApproval || (r.status === 'Approved' ? {
+    userName: 'වරුෂණ ශ්‍රී ධනපාල (Varushana Sri Dhanapala)',
+    userDesignation: 'ලේකම් (Secretary)',
+    ministryName: cleanMinistryName,
+    date: r.updated_at?.slice(0, 10) || ''
+  } : null);
+
+  const secRefNo = secretaryClearance?.myNo || (r.id ? `${cleanMinistryName.slice(0, 3).toUpperCase()}/SEC/${new Date().getFullYear()}/FV-${String(r.id).padStart(4, '0')}` : '...........................');
+  const headName = endorsement.completedBy?.name || d.forwardedDepartment?.headName || (r.status !== 'Pending Department Head Approval' ? 'Head of Department' : '');
+  const headDesignation = endorsement.completedBy?.designation || d.forwardedDepartment?.headDesignation || 'Head of Department / Institution';
+  const applicantName = r.applicant_name || d.applicantName || d.fullName || '—';
+
+  const isSecretaryApproved = r.status === 'Approved' || r.status === 'Pending Presidential Approval' || secretaryClearance?.decision === 'approve';
+  const isSecretaryRejected = r.status === 'Rejected' || secretaryClearance?.decision === 'reject';
+  const secDate = secretaryClearance?.date || secretaryClearance?.timestamp?.slice(0, 10) || (r.status === 'Approved' ? r.updated_at?.slice(0, 10) : '...........................');
+  const secSignature = secretaryClearance?.signature;
+  const secName = secretaryClearance?.userName || secretaryClearance?.signatoryName || (r.status === 'Approved' ? 'වරුෂණ ශ්‍රී ධනපාල (Varushana Sri Dhanapala)' : '');
+
+  printWin.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Secretary Approval Letter - ${secRefNo} - ${applicantName}</title>
+        <style>
+          * { box-sizing: border-box; }
+          body {
+            font-family: "Times New Roman", Times, Georgia, serif;
+            color: #0f172a;
+            background: #f1f5f9;
+            margin: 0;
+            padding: 24px;
+            font-size: 15px;
+            line-height: 1.6;
+          }
+          .no-print-toolbar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: #14532d;
+            color: #ffffff;
+            padding: 12px 20px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 0 auto 24px;
+            max-width: 210mm;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 12px;
+          }
+          .toolbar-btn {
+            border: none;
+            padding: 7px 14px;
+            border-radius: 5px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 11.5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+          }
+          .btn-primary { background: #16a34a; color: #ffffff; }
+          .btn-secondary { background: #334155; color: #ffffff; }
+
+          .sheet-page {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 26mm 22mm;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+          }
+          .sheet-content { flex: 1; }
+
+          .official-letterhead {
+            text-align: center;
+            margin-bottom: 28px;
+            padding-bottom: 14px;
+            border-bottom: 1.5px solid #0f172a;
+          }
+          .republic-title-si { font-size: 13.5px; font-weight: 700; color: #0f172a; letter-spacing: 0.5px; }
+          .republic-title-en { font-size: 11px; font-weight: 700; color: #334155; letter-spacing: 1.2px; text-transform: uppercase; margin-top: 2px; }
+          .department-name { font-size: 17px; font-weight: 800; color: #091e42; margin-top: 6px; }
+          .circular-badge { font-size: 11px; color: #475569; font-style: italic; margin-top: 4px; }
+
+          .top-ref-row { text-align: right; font-size: 15px; margin-bottom: 24px; }
+          .dotted-fill { display: inline-block; border-bottom: 1.2px dotted #0f172a; padding: 0 8px; font-weight: 700; min-width: 180px; text-align: left; }
+          .addressee { font-size: 15.5px; line-height: 1.5; margin-bottom: 40px; }
+
+          .rec-highlight { font-weight: 700; text-decoration: underline; color: #15803d; }
+          .rec-muted { text-decoration: line-through; color: #94a3b8; }
+
+          .footer-row { margin-top: 50px; display: flex; justify-content: space-between; align-items: flex-start; }
+          .date-col { width: 45%; font-size: 15px; }
+          .sig-col { width: 50%; text-align: center; }
+          .sig-img { max-height: 52px; max-width: 220px; display: block; margin: 0 auto 6px; }
+          .sig-line { border-bottom: 1.2px dotted #0f172a; width: 240px; margin: 0 auto 6px; height: 40px; }
+          .sig-caption { border-top: 1.2px dotted #0f172a; padding-top: 6px; font-size: 14px; line-height: 1.4; }
+
+          .doc-footer-meta {
+            margin-top: 25px;
+            padding-top: 8px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #94a3b8;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          }
+
+          @media print {
+            @page { size: A4 portrait; margin: 0; }
+            body { background: #ffffff; padding: 0; }
+            .no-print-toolbar { display: none !important; }
+            .sheet-page { margin: 0; box-shadow: none; height: 297mm; max-height: 297mm; padding: 22mm 20mm; }
           }
         </style>
       </head>
       <body>
         <div class="no-print-toolbar">
           <div>
-            <strong>📄 Head of Department Forwarding Letter (දෙපාර්තමේන්තු ප්‍රධානී ලිපිය)</strong>
-            <span style="font-size: 11px; opacity: 0.85; margin-left: 10px;">Ref: ${refNo} · ${applicantName}</span>
+            <strong>📄 Ministry Secretary Decision Letter (අමාත්‍යාංශ ලේකම් තීරණ ලිපිය)</strong>
+            <span style="opacity: 0.8; margin-left: 10px;">Ref: ${secRefNo} · ${applicantName}</span>
           </div>
           <div style="display: flex; gap: 8px;">
-            <button onclick="window.print()" style="background: #7c3aed; color: #fff; border: none; padding: 6px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 11px;">
-              🖨️ PDF බාගන්න / Print
-            </button>
-            <button onclick="window.close()" style="background: #475569; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 11px;">
-              ✕ වසන්න / Close
-            </button>
+            <button class="toolbar-btn btn-primary" onclick="window.print()">🖨️ PDF බාගන්න / Print</button>
+            <button class="toolbar-btn btn-secondary" onclick="window.close()">✕ වසන්න</button>
           </div>
         </div>
 
-        <div class="page-container">
-          <!-- Government Letterhead -->
-          <div class="gov-letterhead">
-            <div class="republic">Democratic Socialist Republic of Sri Lanka · ශ්‍රී ලංකා ප්‍රජාතාන්ත්‍රික සමාජවාදී ජනරජය</div>
-            <div class="dept">${departmentName}</div>
-            <div class="sub-rule">Establishments Code Chapter XV Section 10:1 · Institutional Forwarding & Recommendation</div>
-          </div>
-
-          <!-- My No. (Align right) -->
-          <div class="ref-right-block">
-            my no.} <span class="ref-dotted">${refNo}</span>
-          </div>
-
-          <!-- Addressee (Align left) -->
-          <div class="addressee-block">
-            The Secretary,<br />
-            Ministry of ${ministryName ? `<u>${ministryName}</u>` : '.....................'}
-          </div>
-
-          <!-- Clause 1 -->
-          <div class="letter-clause">
-            <span class="clause-num">1</span>forward herewith two copies of the leave application of<br />
-            ${salutation} <span class="applicant-fill">${applicantName}</span>. I certify that
-            acting arrangement have been made and that there is no disciplinary
-            action pending or contemplated against this officer.
-          </div>
-
-          <!-- Clause 2 -->
-          <div class="letter-clause">
-            <span class="clause-num">2</span>Prime Minister’s permission has been obtained in terms of Chapter XV
-            -10:1 of the Establishments code. ${pmPermission === 'obtained' ? '<strong>(Obtained)</strong>' : '<em>(Not Applicable)</em>'}
-          </div>
-
-          <!-- Clause 3 -->
-          <div class="letter-clause">
-            <span class="clause-num">3</span>${
-              recommendation === 'recommended'
-                ? 'Leave is <span class="rec-highlight">recommended</span> / <span class="rec-strikethrough">not recommended</span>.'
-                : recommendation === 'not_recommended'
-                ? 'Leave is <span class="rec-strikethrough">recommended</span> / <span class="rec-highlight">not recommended</span>.'
-                : 'Leave is recommended/ not recommended.'
-            }
-          </div>
-
-          ${remarks ? `
-            <div class="remarks-box">
-              <strong>Observations / Remarks:</strong> ${remarks}
-            </div>
-          ` : ''}
-
-          <!-- Date & Signature Block -->
-          <div class="letter-footer">
-            <div class="date-block">
-              Date} <span class="ref-dotted">${date}</span>
+        <div class="sheet-page">
+          <div class="sheet-content">
+            <div class="official-letterhead">
+              <div class="republic-title-si">ශ්‍රී ලංකා ප්‍රජාතාන්ත්‍රික සමාජවාදී ජනරජය</div>
+              <div class="republic-title-en">Democratic Socialist Republic of Sri Lanka</div>
+              <div class="department-name">Ministry of ${cleanMinistryName}</div>
+              <div class="circular-badge">Establishments Code Chapter XV Section 10:1 · Ministerial Decision & Directive to Head of Department</div>
             </div>
 
-            <div class="signature-block">
-              ${signature ? `<img src="${signature}" class="sig-img" alt="Head of Department Signature" />` : '<div class="sig-dotted-line"></div>'}
-              <div class="sig-title-block">
-                ${headName ? `<strong>${headName}</strong><br>` : ''}
-                Signature and<br />
-                Designation of Head of<br />
-                Department<br />
-                ${headDesignation ? `<span style="font-size: 12px; font-weight: normal;">${headDesignation}</span><br>` : ''}
-                ${departmentName ? `<span style="font-size: 11px; font-weight: normal; color: #475569;">${departmentName}</span>` : ''}
+            <div class="top-ref-row">
+              my no.} <span class="dotted-fill">${secRefNo}</span>
+            </div>
+
+            <div class="addressee">
+              <span class="dotted-fill" style="min-width: 320px; font-weight: normal;">${headName ? `${headName}, ${headDesignation}` : '......................................................................'}</span><br />
+              Head of Department,<br />
+              <span style="font-size: 13.5px; color: #475569;">${departmentName}</span>
+            </div>
+
+            <div style="text-align: center; margin: 55px 0 65px;">
+              <div style="border-bottom: 1.2px dotted #0f172a; width: 340px; margin: 0 auto 10px;"></div>
+              <div style="font-size: 18px; letter-spacing: 0.5px;">
+                Leave is ${
+                  isSecretaryApproved
+                    ? '<span class="rec-highlight" style="font-size: 19px;">approved</span> / <span class="rec-muted">not approved</span>'
+                    : isSecretaryRejected
+                    ? '<span class="rec-muted">approved</span> / <span class="rec-highlight" style="color: #b91c1c; font-size: 19px;">not approved</span>'
+                    : 'approved / not approved'
+                }
               </div>
             </div>
+
+            <div class="footer-row">
+              <div class="date-col">
+                <div>Date} <span class="dotted-fill" style="min-width: 140px;">${secDate}</span></div>
+                <div style="margin-top: 24px; font-size: 13px; color: #334155; font-style: italic;">
+                  copy to: Secretary to the Prime Minister.
+                </div>
+              </div>
+
+              <div class="sig-col">
+                ${secSignature ? `<img src="${secSignature}" class="sig-img" alt="Secretary Signature" />` : '<div class="sig-line"></div>'}
+                <div class="sig-caption">
+                  ${secName ? `<strong>${secName}</strong><br />` : ''}
+                  Secretary.<br />
+                  ministry of <span style="border-bottom: 1.2px dotted #0f172a; padding: 0 6px; font-weight: 700;">${cleanMinistryName}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="doc-footer-meta">
+            <span>Establishments Code Chapter XV · Section 10:1 (Part II: Ministry Secretary)</span>
+            <span>Ref: ${secRefNo}</span>
           </div>
         </div>
 
@@ -4267,11 +6101,13 @@ export function printDepartmentHeadLetterPdf(r) {
   printWin.document.close();
 }
 
-export const printHeadOfDepartmentLetterPdf = printDepartmentHeadLetterPdf;
+export const printMinistrySecretaryLetterPdf = printSecretaryApprovalLetterPdf;
 
 if (typeof window !== 'undefined') {
   window.printDepartmentHeadLetterPdf = printDepartmentHeadLetterPdf;
   window.printHeadOfDepartmentLetterPdf = printDepartmentHeadLetterPdf;
+  window.printSecretaryApprovalLetterPdf = printSecretaryApprovalLetterPdf;
+  window.printMinistrySecretaryLetterPdf = printSecretaryApprovalLetterPdf;
 }
 
 // =========================================================================
@@ -5054,6 +6890,22 @@ export function DepartmentHeadEndorsementSection({ request, user, language = 'en
   const headOfficialDesignation = user?.designation || request.details?.forwardedDepartment?.headDesignation || 'Head of Department / Institution';
   const headInstitution = request.department_name || request.details?.forwardedDepartment?.name || user?.department_name || 'Institution';
 
+  const clearances = Array.isArray(request?.details?.secretariatClearances) ? request.details.secretariatClearances : [];
+  const secretaryClearance = clearances.find(c => c.role === 'secretary' || c.decision === 'approve') || request?.details?.secretaryApproval || (request.status === 'Approved' ? {
+    userName: 'වරුෂණ ශ්‍රී ධනපාල',
+    userDesignation: 'ලේකම් (Secretary), සිවිල් ආරක්ෂක අමාත්‍යාංශය',
+    ministryName: 'සිවිල් ආරක්ෂක අමාත්‍යාංශය',
+    date: request.updated_at?.slice(0, 10) || ''
+  } : null);
+  const isSecretaryDecided = Boolean(secretaryClearance || request.status === 'Approved' || request.status === 'Pending Presidential Approval');
+  const isSecretaryApproved = request.status === 'Approved' || request.status === 'Pending Presidential Approval' || secretaryClearance?.decision === 'approve';
+  const isSecretaryRejected = request.status === 'Rejected' || secretaryClearance?.decision === 'reject';
+  const secRefNo = secretaryClearance?.myNo || (request.id ? `MCS/SEC/${new Date().getFullYear()}/FV-${String(request.id).padStart(4, '0')}` : '...........................');
+  const secName = secretaryClearance?.userName || secretaryClearance?.signatoryName || (request.status === 'Approved' ? 'වරුෂණ ශ්‍රී ධනපාල' : '');
+  const secSignature = secretaryClearance?.signature;
+  const secDate = secretaryClearance?.date || secretaryClearance?.timestamp?.slice(0, 10) || (request.status === 'Approved' ? request.updated_at?.slice(0, 10) : '...........................');
+  const secMinistry = secretaryClearance?.ministryName || existingEndorsement?.ministryName || 'Civil Security';
+
   async function handleSubmit(actionType = 'forward_reviewer') {
     setError('');
     setSuccess('');
@@ -5144,7 +6996,29 @@ export function DepartmentHeadEndorsementSection({ request, user, language = 'en
             }}
           >
             <FileDown size={13} />
-            <span>{language === 'si' ? '📄 ලිපිය PDF' : '📄 Letter PDF'}</span>
+            <span>{language === 'si' ? '📄 ආයතන ප්‍රධානී ලිපිය' : '📄 Dept Head Letter'}</span>
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => printSecretaryApprovalLetterPdf(request)}
+            title={language === 'si' ? 'අමාත්‍යාංශ ලේකම්ගේ නිවාඩු අනුමත ලිපිය PDF ලෙස බාගන්න' : 'Download Ministry Secretary Approval Letter as PDF'}
+            style={{
+              fontSize: '11px',
+              height: '30px',
+              padding: '0 10px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              borderColor: '#86efac',
+              background: '#f0fdf4',
+              color: '#15803d',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}
+          >
+            <FileDown size={13} />
+            <span>{language === 'si' ? '📄 ලේකම් ලිපිය' : '📄 Secretary Letter'}</span>
           </button>
           {isAlreadyCompleted && !isEditing && isDeptHeadOrAdmin && isDeptHeadStage && (
             <button
@@ -5282,7 +7156,67 @@ export function DepartmentHeadEndorsementSection({ request, user, language = 'en
             </div>
           </div>
 
-          <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px dashed #ddd6fe', display: 'flex', justifyContent: 'flex-end' }}>
+          {/* Official Part 2: Ministry Secretary Leave Approval / Directive (Est. Code XV 10:1 - Image 2) */}
+          <div style={{
+            marginTop: '22px',
+            background: isSecretaryDecided ? (isSecretaryApproved ? '#f0fdf4' : '#fef2f2') : '#f8fafc',
+            border: `1.5px dashed ${isSecretaryDecided ? (isSecretaryApproved ? '#86efac' : '#fca5a5') : '#cbd5e1'}`,
+            borderRadius: '8px',
+            padding: '16px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 800, color: '#334155' }}>
+                {language === 'si' ? 'අමාත්‍යාංශ ලේකම්ගේ තීරණය හා නියෝගය (Ministry Secretary Decision & Directive)' : 'Ministry Secretary Decision & Directive (Est. Code XV 10:1)'}
+              </div>
+              <div style={{ fontSize: '11px', color: '#475569' }}>
+                {'my no.}'} <span style={{ borderBottom: '1px dotted #000', padding: '0 6px', fontWeight: 'bold' }}>{isSecretaryDecided ? secRefNo : '...........................'}</span>
+              </div>
+            </div>
+
+            <div style={{ fontSize: '11px', marginBottom: '18px', lineHeight: 1.5 }}>
+              <span style={{ borderBottom: '1px dotted #000', padding: '0 6px', minWidth: '220px', display: 'inline-block' }}>
+                {existingEndorsement.completedBy?.name || headOfficialName || '......................................................................'}
+              </span><br />
+              <strong>Head of Department.</strong>
+            </div>
+
+            <div style={{ textAlign: 'center', margin: '18px 0 24px', fontSize: '13.5px' }}>
+              <div style={{ borderBottom: '1px dotted #000', width: '240px', margin: '0 auto 6px' }}></div>
+              <div>
+                {isSecretaryApproved ? (
+                  <span>Leave is <strong style={{ textDecoration: 'underline', color: '#16a34a' }}>approved</strong> / <span style={{ textDecoration: 'line-through', color: '#94a3b8' }}>not approved</span></span>
+                ) : isSecretaryRejected ? (
+                  <span>Leave is <span style={{ textDecoration: 'line-through', color: '#94a3b8' }}>approved</span> / <strong style={{ textDecoration: 'underline', color: '#dc2626' }}>not approved</strong></span>
+                ) : (
+                  <span>Leave is approved/not approved</span>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '18px', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ fontSize: '11px' }}>
+                <div>{'Date}'} <span style={{ borderBottom: '1px dotted #000', padding: '0 6px' }}>{isSecretaryDecided ? secDate : '...........................'}</span></div>
+                <div style={{ marginTop: '10px', fontSize: '10px', color: '#475569', fontStyle: 'italic' }}>
+                  copy to: Secretary to the Prime Minister.
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'center', fontSize: '11px' }}>
+                {secSignature ? (
+                  <img src={secSignature} alt="Secretary Signature" style={{ maxHeight: '44px', maxWidth: '150px', display: 'block', margin: '0 auto 4px' }} />
+                ) : (
+                  <div style={{ height: '32px', borderBottom: '1px dotted #000', width: '170px', margin: '0 auto 4px' }}></div>
+                )}
+                <div style={{ borderTop: '1px dotted #000', paddingTop: '4px' }}>
+                  {secName && <strong style={{ display: 'block', fontSize: '10.5px' }}>{secName}</strong>}
+                  <strong>Secretary.</strong><br />
+                  ministry of <span style={{ borderBottom: '1px dotted #000', padding: '0 4px', fontWeight: 'bold' }}>{secMinistry || ministryName || '...............................'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px dashed #ddd6fe', display: 'flex', justifyContent: 'flex-end', gap: '8px', flexWrap: 'wrap' }}>
             <button
               type="button"
               className="secondary-button"
@@ -5304,6 +7238,28 @@ export function DepartmentHeadEndorsementSection({ request, user, language = 'en
             >
               <FileDown size={14} />
               <span>{language === 'si' ? '📄 දෙපාර්තමේන්තු ප්‍රධානී ලිපිය PDF බාගන්න' : '📄 Download Head of Dept Letter PDF'}</span>
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => printSecretaryApprovalLetterPdf(request)}
+              title={language === 'si' ? 'අමාත්‍යාංශ ලේකම්ගේ නිවාඩු අනුමත ලිපිය (Leave is approved/not approved) PDF ලෙස බාගන්න' : 'Download Ministry Secretary Approval Letter as PDF'}
+              style={{
+                fontSize: '11px',
+                height: '32px',
+                padding: '0 14px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderColor: '#86efac',
+                background: '#f0fdf4',
+                color: '#15803d',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              <FileDown size={14} />
+              <span>{language === 'si' ? '📄 ලේකම්ගේ ලිපිය PDF බාගන්න' : '📄 Download Secretary Letter PDF'}</span>
             </button>
           </div>
         </div>
@@ -6264,29 +8220,52 @@ export function SecretariatMinuteTrailSection({ request, user, language = 'en', 
                 }}>
                   <div style={{ fontSize: '11px', color: '#166534', lineHeight: 1.6 }}>
                     <div><strong>{language === 'si' ? 'අත්සන් කළ දිනය (Date Signed):' : 'Date Signed:'}</strong> {c.date || c.timestamp?.slice(0, 10)}</div>
-                    <button
-                      type="button"
-                      className="btn-doc-action"
-                      onClick={() => printNoteSheetMinisterialPdf(request)}
-                      title={language === 'si' ? 'අවසර පත්‍රිකාව සහ අමාත්‍ය ඉදිරිපත් කිරීම වෙනම PDF ලෙස බාගන්න' : 'Download Clearance Sheet PDF'}
-                      style={{
-                        marginTop: '6px',
-                        fontSize: '10.5px',
-                        padding: '3px 9px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        borderRadius: '6px',
-                        border: '1px solid #86efac',
-                        background: '#f0fdf4',
-                        color: '#166534',
-                        fontWeight: 700,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <FileDown size={12} />
-                      <span>{language === 'si' ? '📄 අවසර පත්‍රිකාව PDF බාගන්න' : '📄 Download Clearance Sheet PDF'}</span>
-                    </button>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+                      <button
+                        type="button"
+                        className="btn-doc-action"
+                        onClick={() => printNoteSheetMinisterialPdf(request)}
+                        title={language === 'si' ? 'අවසර පත්‍රිකාව සහ අමාත්‍ය ඉදිරිපත් කිරීම වෙනම PDF ලෙස බාගන්න' : 'Download Clearance Sheet PDF'}
+                        style={{
+                          fontSize: '10.5px',
+                          padding: '3px 9px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          borderRadius: '6px',
+                          border: '1px solid #86efac',
+                          background: '#f0fdf4',
+                          color: '#166534',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <FileDown size={12} />
+                        <span>{language === 'si' ? '📄 අවසර පත්‍රිකාව PDF' : '📄 Clearance Sheet PDF'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-doc-action"
+                        onClick={() => printSecretaryApprovalLetterPdf(request)}
+                        title={language === 'si' ? 'අමාත්‍යාංශ ලේකම්ගේ නිවාඩු අනුමත ලිපිය (Leave is approved/not approved) PDF ලෙස බාගන්න' : 'Download Secretary Approval Letter as PDF'}
+                        style={{
+                          fontSize: '10.5px',
+                          padding: '3px 9px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          borderRadius: '6px',
+                          border: '1px solid #16a34a',
+                          background: '#dcfce7',
+                          color: '#15803d',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <FileDown size={12} />
+                        <span>{language === 'si' ? '📄 ලේකම් ලිපිය PDF (Approved Letter)' : '📄 Secretary Letter PDF'}</span>
+                      </button>
+                    </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     {c.signature && (
@@ -6378,11 +8357,35 @@ export function SecretariatMinuteTrailSection({ request, user, language = 'en', 
               border: '2px solid #86efac',
               borderRadius: '8px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                <Landmark size={18} style={{ color: '#16a34a' }} />
-                <strong style={{ fontSize: '13.5px', color: '#14532d' }}>
-                  ගරු අමාත්‍යාංශය
-                </strong>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Landmark size={18} style={{ color: '#16a34a' }} />
+                  <strong style={{ fontSize: '13.5px', color: '#14532d' }}>
+                    ගරු අමාත්‍යාංශය
+                  </strong>
+                </div>
+                <button
+                  type="button"
+                  className="btn-doc-action"
+                  onClick={() => printSecretaryApprovalLetterPdf(request)}
+                  title={language === 'si' ? 'අමාත්‍යාංශ ලේකම්ගේ නිවාඩු අනුමත ලිපිය පූර්වදර්ශනය / PDF බාගන්න' : 'Preview / Download Ministry Secretary Approval Letter as PDF'}
+                  style={{
+                    fontSize: '10.5px',
+                    padding: '3px 10px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    borderRadius: '6px',
+                    border: '1px solid #16a34a',
+                    background: '#ffffff',
+                    color: '#15803d',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <FileDown size={12} />
+                  <span>{language === 'si' ? '📄 ලේකම් ලිපිය PDF (Leave Approved Letter)' : '📄 Secretary Letter PDF'}</span>
+                </button>
               </div>
               <p style={{ margin: 0, fontSize: '12.5px', color: '#166534', lineHeight: 1.6, fontWeight: 600 }}>
                 ඉහත නම් සඳහන් නිලධාරියාගේ විදේශ නිවාඩු ඉල්ලීම නිර්දේශ කරනු ලබන අතර ඔබගේ අනුමැතිය සඳහා කාරුණිකව ඉදිරිපත් කරමි.
@@ -6964,6 +8967,523 @@ export function PresidentialOrderSection({ request, user, language = 'en', token
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// =========================================================================
+// SUBJECT OFFICER NOTE SHEET STANDALONE PDF VIEWER / PRINTER
+// =========================================================================
+export function printSubjectOfficerNoteSheetPdf(r) {
+  if (!r) return;
+  const printWin = window.open('', '_blank');
+  if (!printWin) {
+    alert('Please allow popups in your browser to view/print the Note Sheet.');
+    return;
+  }
+
+  const d = r.details || (r.applicant_name ? r : {});
+  const refNo = r.id ? `FV-${String(r.id).padStart(4, '0')}` : 'FV-REF';
+  const applicantName = d.fullName || r.applicant_name || '—';
+  const designation = d.designation || r.designation || '—';
+  const department = r.department_name || d.department || '—';
+  const rawMinistry = d.ministry || 'Technology';
+  const cleanMinistryName = rawMinistry.replace(/^(ministry\s+of\s+|අමාත්‍යාංශය\s*)/i, '').trim() || rawMinistry;
+  const note = d.noteSheet || {};
+  const completedBy = d.officerCompletedBy || {};
+  const officerSignature = d.officerSignature;
+  const officerRemarks = d.officerRemarks || note.remarks || 'ඉහත කරුණු සලකා බලා නිලධාරියාගේ ඉල්ලීම අමාත්‍යාංශ ලේකම්ගේ අනුමැතිය සහ අතිගරු ජනාධිපතිතුමාගේ අවසන් නියෝගය සඳහා නිර්දේශ කර ඉදිරිපත් කරමි.';
+
+  printWin.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Subject Officer Note Sheet - ${refNo}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: "Times New Roman", Times, Georgia, serif; color: #0f172a; margin: 0; padding: 20px; font-size: 13.5px; line-height: 1.6; }
+    .sheet { width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff; padding: 22mm 20mm; }
+    .header { text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 20px; }
+    .note-content { font-size: 13px; line-height: 1.7; text-align: justify; }
+    .no-print-toolbar {
+      position: sticky; top: 0; background: #0f172a; color: #fff;
+      padding: 10px 18px; display: flex; justify-content: space-between;
+      align-items: center; margin-bottom: 16px; border-radius: 6px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .toolbar-btn {
+      padding: 6px 14px; font-size: 11px; font-weight: 700; border-radius: 4px;
+      cursor: pointer; border: 1px solid transparent;
+    }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-secondary { background: #334155; color: #fff; }
+    @media print {
+      @page { size: A4 portrait; margin: 12mm; }
+      body { padding: 0; }
+      .no-print-toolbar { display: none !important; }
+      .sheet { padding: 0; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print-toolbar">
+    <div>
+      <strong>📄 Subject Officer Note Sheet (විෂය භාර නිලධාරී සටහන් පත්‍රිකාව)</strong>
+      <span style="opacity: 0.8; margin-left: 10px;">Ref: ${refNo} · ${applicantName}</span>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button class="toolbar-btn btn-primary" onclick="window.print()">🖨️ PDF බාගන්න / Print</button>
+      <button class="toolbar-btn btn-secondary" onclick="window.close()">✕ වසන්න</button>
+    </div>
+  </div>
+  <div class="sheet">
+    <div class="header">
+      <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; color: #1e3a8a;">Democratic Socialist Republic of Sri Lanka · Ministry of ${cleanMinistryName}</div>
+      <div style="font-size: 18px; font-weight: 800; margin: 4px 0;">Official Ministerial Note Sheet (සටහන් පත්‍රිකාව)</div>
+      <div style="font-size: 12.5px; color: #475569;">Est. Code Chapter XII · Subject Officer Submission from Outside Department</div>
+    </div>
+    <div style="margin-bottom: 18px; padding: 8px 12px; background: #f8fafc; border: 1px solid #e2e8f0; font-size: 12px; display: flex; justify-content: space-between;">
+      <div><strong>Applicant:</strong> ${applicantName} (${designation})</div>
+      <div><strong>Originating Institution:</strong> ${department}</div>
+      <div><strong>Ref:</strong> ${refNo}</div>
+    </div>
+    <div class="note-content">
+      <p><strong>ගරු ලේකම්තුමා / අතිරේක ලේකම්තුමා වෙත (To Ministry Secretary / Additional Secretary):</strong></p>
+      <p>1. <strong>හඳුන්වාදීම සහ පසුබිම (Introduction & Context):</strong><br />
+      ${department} හි සේවය කරන ${designation} ${applicantName} මහතා/මිය විසින් ${r.start_date || '—'} සිට ${r.end_date || '—'} දක්වා ${r.destination || '—'} බලා නිවාඩු ලබා ගැනීම සඳහා ඉදිරිපත් කරන ලද ඉල්ලීම ආයතන ප්‍රධානියාගේ නිර්දේශය සහිතව අමාත්‍යාංශය වෙත ලැබී ඇත.</p>
+      
+      <p>2. <strong>නිවාඩු හිමිකම සහ ආයතන සංග්‍රහයට අනුකූලතාව (Entitlement & Est. Code Verification):</strong><br />
+      අදාළ නිලධාරියාගේ නිවාඩු ලේඛන පරීක්ෂා කර බැලූ අතර, ඉල්ලා ඇති කාලසීමාව සඳහා ප්‍රමාණවත් නිවාඩු ශේෂයක් පවතින බවට තහවුරු කර ඇත. වැඩබැලීමේ විධිවිධාන ආයතන ප්‍රධානියා විසින් සහතික කර ඇති අතර විනය ක්‍රියාමාර්ග කිසිවක් නොමැත.</p>
+
+      <p>3. <strong>විෂයභාර නිලධාරියාගේ නිරීක්ෂණය සහ ඉදිරිපත් කිරීම (Officer Observation & Recommendation):</strong><br />
+      ${officerRemarks}</p>
+    </div>
+    <div style="margin-top: 40px; display: flex; justify-content: flex-end;">
+      <div style="width: 260px; text-align: center;">
+        ${officerSignature ? `<img src="${officerSignature}" style="max-height: 48px; max-width: 200px; display: block; margin: 0 auto 4px;" />` : '<div style="border-bottom: 1px dotted #000; height: 38px; margin-bottom: 4px;"></div>'}
+        <div style="border-top: 1px dotted #000; padding-top: 4px; font-size: 12px;">
+          <strong>${completedBy.name || 'Subject Officer'}</strong><br />
+          Subject Officer (Leave & Establishments)<br />
+          Ministry of ${cleanMinistryName}<br />
+          Date: ${d.officerCompletedAt?.slice(0, 10) || '—'}
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    window.onload = function() {
+      window.print();
+    };
+  </script>
+</body>
+</html>`);
+  printWin.document.close();
+}
+
+// =========================================================================
+// APPLICATION ZIP DOSSIER DOWNLOAD HELPER
+// =========================================================================
+export async function downloadApplicationZip(request, token) {
+  if (!request?.id) return;
+  const refNo = `FV-${String(request.id).padStart(4, '0')}`;
+  const zipFileName = `${refNo}.zip`;
+  const url = `/api/requests/${request.id}/download-zip${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+
+  try {
+    const res = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Download failed with HTTP ${res.status}`);
+    }
+    const blob = await res.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = zipFileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  } catch (err) {
+    console.warn('Fetch download failed, fallback to direct browser URL navigation:', err);
+    window.open(url, '_blank');
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.downloadApplicationZip = downloadApplicationZip;
+  window.printSubjectOfficerNoteSheetPdf = printSubjectOfficerNoteSheetPdf;
+}
+
+// =========================================================================
+// APPLICATION ZIP PACKAGE CARD (Displays All 7 Items with Action Buttons)
+// =========================================================================
+export function ApplicationZipPackageCard({ request, token, language = 'en' }) {
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState(null);
+  const [downloadDone, setDownloadDone] = useState(false);
+
+  if (!request?.id) return null;
+
+  const d = request.details || (request.applicant_name ? request : {});
+  const refNo = `FV-${String(request.id).padStart(4, '0')}`;
+  const docs = d.documents || {};
+  const applicantDocsList = [
+    { key: 'institutionLetter', name: docs.institutionLetter?.name || 'Head of Institution Letter', doc: docs.institutionLetter, titleEn: '1. Head of Institution Recommendation Letter', titleSi: '1. ආයතන ප්‍රධානී නිර්දේශ ලිපිය' },
+    { key: 'passportImage', name: docs.passportImage?.name || 'Passport Bio Page', doc: docs.passportImage, titleEn: '2. Passport Bio-Data Page', titleSi: '2. විදේශ ගමන් බලපත්‍රයේ පිටපත' },
+    { key: 'requestLetter', name: docs.requestLetter?.name || 'Applicant Request Letter', doc: docs.requestLetter, titleEn: '3. Applicant Formal Request Letter', titleSi: '3. අයදුම්කරුගේ ලිඛිත ඉල්ලීම් ලිපිය' },
+    { key: 'otherDocuments', name: docs.otherDocuments?.name || 'Other Supporting Document', doc: docs.otherDocuments, titleEn: '4. Other Supporting Documents', titleSi: '4. වෙනත් අදාළ උපකාරක ලේඛන' },
+  ].filter(item => item.doc);
+
+  const handleZipDownload = async () => {
+    setDownloading(true);
+    setDownloadError(null);
+    setDownloadDone(false);
+    try {
+      await downloadApplicationZip(request, token);
+      setDownloadDone(true);
+      setTimeout(() => setDownloadDone(false), 4500);
+    } catch (err) {
+      setDownloadError(err.message || 'Download failed');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <div style={{
+      background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)',
+      border: '1.5px solid #93c5fd',
+      borderRadius: '10px',
+      padding: '16px 18px',
+      marginBottom: '18px',
+      boxShadow: '0 2px 10px rgba(37, 99, 235, 0.06)'
+    }}>
+      {/* Top Banner: Package Title & Big ZIP Download Button */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', marginBottom: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '8px',
+            background: '#eff6ff',
+            border: '1.5px solid #bfdbfe',
+            color: '#1d4ed8',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <FolderArchive size={22} />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h4 style={{ margin: 0, fontSize: '14.5px', fontWeight: 800, color: '#0f172a' }}>
+                {language === 'si'
+                  ? `අයදුම්පත් ලේඛන පැකේජය (ZIP Package) · ${refNo}.zip`
+                  : `Application Document Package · ${refNo}.zip`}
+              </h4>
+              <span style={{
+                background: '#1e3a8a',
+                color: '#fff',
+                fontSize: '10.5px',
+                fontWeight: 700,
+                padding: '2px 8px',
+                borderRadius: '4px'
+              }}>
+                7 Documents (PDF)
+              </span>
+            </div>
+            <p style={{ margin: '3px 0 0 0', fontSize: '11.5px', color: '#64748b' }}>
+              {language === 'si'
+                ? 'රාජ්‍ය සේවා විදේශ නිවාඩු රෙගුලාසි යටතේ අවශ්‍ය සියලුම නිල ලේඛන 7 කට්ටලයම එකවර ZIP ගොනුවක් ලෙස බාගත කරගන්න.'
+                : 'All 7 mandatory public service foreign leave documents consolidated into a single ZIP archive named with the application reference number.'}
+            </p>
+          </div>
+        </div>
+
+        {/* The Main Download ZIP Button */}
+        <div>
+          <button
+            type="button"
+            className="primary-button"
+            disabled={downloading}
+            onClick={handleZipDownload}
+            style={{
+              height: '38px',
+              padding: '0 18px',
+              fontSize: '12px',
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: downloadDone ? '#15803d' : '#1e3a8a',
+              borderColor: downloadDone ? '#166534' : '#172554',
+              boxShadow: '0 2px 6px rgba(30, 58, 138, 0.25)',
+              cursor: downloading ? 'wait' : 'pointer'
+            }}
+          >
+            {downloading ? (
+              <>
+                <Clock size={16} />
+                <span>{language === 'si' ? 'ZIP ගොනුව සකසමින්...' : 'Generating ZIP Package...'}</span>
+              </>
+            ) : downloadDone ? (
+              <>
+                <CheckCircle2 size={16} />
+                <span>{language === 'si' ? 'බාගත විය! (Downloaded)' : `Downloaded ${refNo}.zip!`}</span>
+              </>
+            ) : (
+              <>
+                <FolderArchive size={16} />
+                <span>{language === 'si' ? `ZIP ගොනුව බාගන්න (${refNo}.zip)` : `Download Complete ZIP (${refNo}.zip)`}</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {downloadError && (
+        <div style={{ marginBottom: '12px', padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#b91c1c', fontSize: '11.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <AlertCircle size={14} />
+          <span>{downloadError}</span>
+        </div>
+      )}
+
+      {/* The 7 Numbered Items Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '8px' }}>
+        {/* Item 1 */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#eff6ff', border: '1px solid #93c5fd', color: '#1d4ed8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>1</span>
+            <div>
+              <strong style={{ fontSize: '12px', color: '#0f172a', display: 'block' }}>
+                {language === 'si' ? 'සාමාන්‍ය 126 PDF (General 126 PDF)' : 'General 126 PDF'}
+              </strong>
+              <span style={{ fontSize: '10.5px', color: '#64748b' }}>
+                Est. Code Ch. XII Sec. 1:4 & App. 16
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => printGeneral126Pdf(request)}
+            style={{ height: '26px', padding: '0 8px', fontSize: '10.5px', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#1e40af', borderColor: '#bfdbfe', background: '#eff6ff', flexShrink: 0 }}
+          >
+            <FileDown size={12} />
+            <span>{language === 'si' ? 'PDF බලන්න' : 'View PDF'}</span>
+          </button>
+        </div>
+
+        {/* Item 2 */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#eff6ff', border: '1px solid #93c5fd', color: '#1d4ed8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>2</span>
+            <div>
+              <strong style={{ fontSize: '12px', color: '#0f172a', display: 'block' }}>
+                {language === 'si' ? 'කාර්යාලීය ප්‍රයෝජනය සඳහා පමණි PDF' : 'For Office Use Only PDF'}
+              </strong>
+              <span style={{ fontSize: '10.5px', color: '#64748b' }}>
+                Est. Code Ch. XII Items 13–19 (Particulars of Available Leave)
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => printOfficeUseOnlyPdf(request)}
+            style={{ height: '26px', padding: '0 8px', fontSize: '10.5px', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#1e40af', borderColor: '#bfdbfe', background: '#eff6ff', flexShrink: 0 }}
+          >
+            <FileDown size={12} />
+            <span>{language === 'si' ? 'PDF බලන්න' : 'View PDF'}</span>
+          </button>
+        </div>
+
+        {/* Item 3 */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#eff6ff', border: '1px solid #93c5fd', color: '#1d4ed8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>3</span>
+            <div>
+              <strong style={{ fontSize: '12px', color: '#0f172a', display: 'block' }}>
+                {language === 'si' ? 'දෙපාර්තමේන්තු ප්‍රධානී ලිපිය PDF' : 'Department Head Letter PDF'}
+              </strong>
+              <span style={{ fontSize: '10.5px', color: '#64748b' }}>
+                Est. Code Ch. XV Sec. 10:1 (Part I: Head of Department Endorsement)
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => printDepartmentHeadLetterPdf(request)}
+            style={{ height: '26px', padding: '0 8px', fontSize: '10.5px', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#1e40af', borderColor: '#bfdbfe', background: '#eff6ff', flexShrink: 0 }}
+          >
+            <FileDown size={12} />
+            <span>{language === 'si' ? 'PDF බලන්න' : 'View PDF'}</span>
+          </button>
+        </div>
+
+        {/* Item 4 */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#eff6ff', border: '1px solid #93c5fd', color: '#1d4ed8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>4</span>
+            <div>
+              <strong style={{ fontSize: '12px', color: '#0f172a', display: 'block' }}>
+                {language === 'si' ? 'අමාත්‍යාංශ ලේකම් ලිපිය PDF' : 'Secretary Letter PDF'}
+              </strong>
+              <span style={{ fontSize: '10.5px', color: '#64748b' }}>
+                Est. Code Ch. XV Sec. 10:1 (Part II: Ministerial Order - Leave is approved/not approved)
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => printSecretaryApprovalLetterPdf(request)}
+            style={{ height: '26px', padding: '0 8px', fontSize: '10.5px', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#1e40af', borderColor: '#bfdbfe', background: '#eff6ff', flexShrink: 0 }}
+          >
+            <FileDown size={12} />
+            <span>{language === 'si' ? 'PDF බලන්න' : 'View PDF'}</span>
+          </button>
+        </div>
+
+        {/* Item 5 */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#eff6ff', border: '1px solid #93c5fd', color: '#1d4ed8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>5</span>
+            <div>
+              <strong style={{ fontSize: '12px', color: '#0f172a', display: 'block' }}>
+                {language === 'si' ? 'අවසර පත්‍රිකාව PDF (Clearance Sheet)' : 'Clearance Sheet PDF'}
+              </strong>
+              <span style={{ fontSize: '10.5px', color: '#64748b' }}>
+                Secretariat Minute Trail · Multi-Stage Hierarchy Clearances
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => printNoteSheetMinisterialPdf(request)}
+            style={{ height: '26px', padding: '0 8px', fontSize: '10.5px', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#1e40af', borderColor: '#bfdbfe', background: '#eff6ff', flexShrink: 0 }}
+          >
+            <FileDown size={12} />
+            <span>{language === 'si' ? 'PDF බලන්න' : 'View PDF'}</span>
+          </button>
+        </div>
+
+        {/* Item 6 */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#eff6ff', border: '1px solid #93c5fd', color: '#1d4ed8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>6</span>
+            <div>
+              <strong style={{ fontSize: '12px', color: '#0f172a', display: 'block' }}>
+                {language === 'si' ? 'සටහන් පත්‍රිකාව PDF (Note Sheet PDF)' : 'Note Sheet PDF'}
+              </strong>
+              <span style={{ fontSize: '10.5px', color: '#64748b' }}>
+                Subject Officer Assessment & Submission from Outside Department
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => printSubjectOfficerNoteSheetPdf(request)}
+            style={{ height: '26px', padding: '0 8px', fontSize: '10.5px', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#1e40af', borderColor: '#bfdbfe', background: '#eff6ff', flexShrink: 0 }}
+          >
+            <FileDown size={12} />
+            <span>{language === 'si' ? 'PDF බලන්න' : 'View PDF'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Item 7: Applicant Uploaded Documents (only one by one pdf) */}
+      <div style={{
+        marginTop: '10px',
+        background: '#ffffff',
+        border: '1px solid #cbd5e1',
+        borderRadius: '6px',
+        padding: '10px 14px'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: applicantDocsList.length > 0 ? '8px' : '0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#eff6ff', border: '1px solid #93c5fd', color: '#1d4ed8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>7</span>
+            <div>
+              <strong style={{ fontSize: '12px', color: '#0f172a' }}>
+                {language === 'si'
+                  ? 'අයදුම්කරු විසින් අමුණන ලද ලේඛන (Applicant Upload Documents - Only One by One PDF)'
+                  : 'Applicant Upload Documents (Only One by One PDF)'}
+              </strong>
+              <span style={{ fontSize: '10.5px', color: '#64748b', marginLeft: '6px' }}>
+                {applicantDocsList.length > 0 ? `(${applicantDocsList.length} files attached)` : '(No attached files)'}
+              </span>
+            </div>
+          </div>
+          <span style={{ fontSize: '10.5px', color: '#2563eb', fontWeight: 600 }}>
+            {language === 'si' ? 'ZIP තුළ එක් එක් ලේඛනය වෙන වෙනම PDF ලෙස අඩංගු වේ' : 'Packed individually as clean A4 PDFs in ZIP'}
+          </span>
+        </div>
+
+        {applicantDocsList.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '6px' }}>
+            {applicantDocsList.map((item) => (
+              <div key={item.key} style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '6px 10px',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '5px',
+                fontSize: '11px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                  <Paperclip size={13} style={{ color: '#64748b', flexShrink: 0 }} />
+                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontWeight: 600, color: '#1e293b' }}>
+                      {language === 'si' ? item.titleSi : item.titleEn}
+                    </div>
+                    <div style={{ fontSize: '9.5px', color: '#64748b' }}>
+                      {item.doc.name || item.name} {item.doc.size ? `· ${formatFileSize(item.doc.size)}` : ''}
+                    </div>
+                  </div>
+                </div>
+                {item.doc.dataUrl && (
+                  <a
+                    href={item.doc.dataUrl}
+                    download={item.doc.name || `${item.key}.pdf`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '3px 8px',
+                      background: '#eff6ff',
+                      color: '#1d4ed8',
+                      border: '1px solid #bfdbfe',
+                      borderRadius: '4px',
+                      textDecoration: 'none',
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      flexShrink: 0
+                    }}
+                  >
+                    <Download size={11} />
+                    <span>Download</span>
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#94a3b8', fontStyle: 'italic' }}>
+            {language === 'si' ? 'අයදුම්කරු විසින් අමතර ලේඛන උඩුගත කර නොමැත.' : 'No additional live documents were uploaded by applicant for this request.'}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
