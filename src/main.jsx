@@ -40,7 +40,18 @@ import {
   X
 } from 'lucide-react';
 import SignaturePad from './signature-pad.jsx';
-import DetailedRequestModal, { RequestDetails } from './request-modal.jsx';
+import DetailedRequestModal, {
+  RequestDetails,
+  DepartmentHeadEndorsementSection,
+  OfficerAssessmentSection,
+  SecretariatMinuteTrailSection,
+  printSubjectOfficerPdf,
+  printGeneral126Pdf,
+  printOfficeUseOnlyPdf,
+  printDepartmentHeadLetterPdf,
+  printNoteSheetMinisterialPdf,
+  PresidentialOrderSection
+} from './request-modal.jsx';
 import './styles.css';
 import './official-theme.css';
 
@@ -113,13 +124,23 @@ const copy = {
     roleNames: {
       admin: 'Administrator',
       applicant: 'Applicant',
-      reviewer: 'Reviewer',
+      department_head: 'Head of Department',
+      reviewer: 'Subject Officer',
+      assistant_secretary: 'Assistant Secretary',
+      senior_assistant_secretary: 'Senior Assistant Secretary',
+      additional_secretary: 'Additional Secretary',
+      secretary: 'Ministry Secretary',
       authorized_official: 'Authorized Official',
       minister: 'Minister',
-      president: "President's Secretariat"
+      president: 'President & Ministry of Digital Economy'
     },
     statuses: {
-      'Pending Review': 'Reviewer review',
+      'Pending Department Head Approval': 'Pending Dept Head Approval',
+      'Pending Review': 'Pending Subject Officer Review',
+      'Pending Assistant Secretary Review': 'Pending Assistant Secretary',
+      'Pending Senior Assistant Secretary Review': 'Pending Senior Assistant Secretary',
+      'Pending Additional Secretary Review': 'Pending Additional Secretary',
+      'Pending Secretary Approval': 'Pending Secretary Approval',
       'Pending Official Authorization': 'Official authorization',
       'Pending Minister Approval': 'Minister approval',
       'Pending Presidential Approval': 'Presidential approval',
@@ -139,7 +160,7 @@ const copy = {
     requestCreated: 'Request submitted for review.',
     decisionSaved: 'Decision recorded.',
     pipelineTitle: 'Approval Workflow Pipeline',
-    pipelineSubtitle: 'Applicant submission → Reviewer verification → Authority clearance → Authorization',
+    pipelineSubtitle: 'Applicant → Department Head → Subject Officer → Secretariat (Asst Sec ➔ Sr Asst Sec ➔ Addl Sec ➔ Secretary)',
     exportCsv: 'Export CSV',
     printReport: 'Print Report',
     addNewUserTitle: 'Add New Officer / User',
@@ -249,13 +270,23 @@ const copy = {
     roleNames: {
       admin: 'පරිපාලක (Admin)',
       applicant: 'අයදුම්කරු (Applicant)',
-      reviewer: 'සමාලෝචන නිලධාරී (Reviewer)',
+      department_head: 'ආයතන ප්‍රධානියා (Head of Department)',
+      reviewer: 'විෂයභාර නිලධාරී (Subject Officer)',
+      assistant_secretary: 'සහකාර ලේකම් (Assistant Secretary)',
+      senior_assistant_secretary: 'ජ්‍යෙෂ්ඨ සහකාර ලේකම් (Senior Asst. Secretary)',
+      additional_secretary: 'අතිරේක ලේකම් (Additional Secretary)',
+      secretary: 'අමාත්‍යාංශ ලේකම් (Ministry Secretary)',
       authorized_official: 'බලයලත් නිලධාරී (Official)',
       minister: 'අමාත්‍යවරයා (Minister)',
-      president: 'ජනාධිපති ලේකම් කාර්යාලය (President)'
+      president: 'ජනාධිපති සහ ඩිජිටල් ආර්ථික අමාත්‍යාංශය (President)'
     },
     statuses: {
-      'Pending Review': 'සමාලෝචනය වෙමින් පවතී',
+      'Pending Department Head Approval': 'ආයතන ප්‍රධානී අනුමැතිය',
+      'Pending Review': 'විෂයභාර නිලධාරී සමාලෝචනය',
+      'Pending Assistant Secretary Review': 'සහකාර ලේකම් සමාලෝචනය',
+      'Pending Senior Assistant Secretary Review': 'ජ්‍යෙෂ්ඨ සහකාර ලේකම් සමාලෝචනය',
+      'Pending Additional Secretary Review': 'අතිරේක ලේකම් සමාලෝචනය',
+      'Pending Secretary Approval': 'අමාත්‍යාංශ ලේකම් අනුමැතිය',
       'Pending Official Authorization': 'බලයලත් නිලධාරී අනුමැතිය',
       'Pending Minister Approval': 'අමාත්‍ය අනුමැතිය',
       'Pending Presidential Approval': 'ජනාධිපති අනුමැතිය',
@@ -275,7 +306,7 @@ const copy = {
     requestCreated: 'ඉල්ලීම සමාලෝචනයට ඉදිරිපත් කළා.',
     decisionSaved: 'තීරණය සටහන් කළා.',
     pipelineTitle: 'අනුමත කිරීමේ අදියර ප්‍රවාහය',
-    pipelineSubtitle: 'අයදුම්කරු → සමාලෝචන නිලධාරී → බලයලත් ආයතන අනුමැතිය → අවසරය',
+    pipelineSubtitle: 'අයදුම්කරු → ආයතන ප්‍රධානියා → විෂයභාර නිලධාරී → ලේකම් කාර්යාලය (සහකාර ලේකම් ➔ ජ්‍යෙෂ්ඨ සහකාර ➔ අතිරේක ලේකම් ➔ ලේකම්)',
     exportCsv: 'CSV බාගන්න',
     printReport: 'වාර්තාව මුද්‍රණය',
     addNewUserTitle: 'නව පරිශීලකයෙකු එකතු කරන්න',
@@ -321,11 +352,13 @@ const copy = {
 
 const sampleUsers = [
   { role: 'admin', email: 'admin@foring.gov.lk', pass: 'Admin@123', label: 'Administrator', labelSi: 'පරිපාලක' },
-  { role: 'applicant', email: 'officer@foring.gov.lk', pass: 'Demo@123', label: 'Applicant Officer', labelSi: 'අයදුම්කරු' },
-  { role: 'reviewer', email: 'reviewer@foring.gov.lk', pass: 'Demo@123', label: 'Reviewing Officer', labelSi: 'සමාලෝචක' },
-  { role: 'authorized_official', email: 'authorized@foring.gov.lk', pass: 'Demo@123', label: 'Authorized Official', labelSi: 'බලයලත් නිලධාරී' },
-  { role: 'minister', email: 'minister@foring.gov.lk', pass: 'Demo@123', label: 'Hon. Minister', labelSi: 'අමාත්‍යවරයා' },
-  { role: 'president', email: 'president@foring.gov.lk', pass: 'Demo@123', label: "President's Office", labelSi: 'ජනාධිපති කාර්යාලය' }
+  { role: 'applicant', email: 'officer@foring.gov.lk', pass: 'Demo@123', label: 'Applicant Officer (Nimal Perera)', labelSi: 'අයදුම්කරු (නිමල් පෙරේරා)' },
+  { role: 'department_head', email: 'head.cert@foring.gov.lk', pass: 'Demo@123', label: 'Department Head (SLCERT)', labelSi: 'ආයතන ප්‍රධානියා (SLCERT)' },
+  { role: 'reviewer', email: 'reviewer@foring.gov.lk', pass: 'Demo@123', label: 'Subject Officer', labelSi: 'විෂයභාර නිලධාරී' },
+  { role: 'assistant_secretary', email: 'asst.sec@foring.gov.lk', pass: 'Demo@123', label: 'Assistant Secretary', labelSi: 'සහකාර ලේකම්' },
+  { role: 'senior_assistant_secretary', email: 'senior.asst.sec@foring.gov.lk', pass: 'Demo@123', label: 'Senior Asst. Secretary', labelSi: 'ජ්‍යෙෂ්ඨ සහකාර ලේකම්' },
+  { role: 'additional_secretary', email: 'addl.sec@foring.gov.lk', pass: 'Demo@123', label: 'Additional Secretary', labelSi: 'අතිරේක ලේකම්' },
+  { role: 'secretary', email: 'secretary@foring.gov.lk', pass: 'Demo@123', label: 'Ministry Secretary', labelSi: 'අමාත්‍යාංශ ලේකම් (වරුෂණ ශ්‍රී ධනපාල)' },
 ];
 
 function App() {
@@ -528,6 +561,14 @@ function App() {
     setUserFormBusy(true);
     setUserFormError('');
     try {
+      const defaultDesignation = newUserRole === 'president' ? 'ජනාධිපති සහ ඩිජිටල් ආර්ථික අමාත්‍යාංශය'
+        : newUserRole === 'secretary' ? 'ලේකම්, සිවිල් ආරක්ෂක අමාත්‍යාංශය'
+        : newUserRole === 'additional_secretary' ? 'අතිරේක ලේකම් (Additional Secretary)'
+        : newUserRole === 'senior_assistant_secretary' ? 'ජ්‍යෙෂ්ඨ සහකාර ලේකම් (Senior Assistant Secretary)'
+        : newUserRole === 'assistant_secretary' ? 'සහකාර ලේකම් (Assistant Secretary)'
+        : newUserRole === 'reviewer' ? 'විෂයභාර නිලධාරී (Subject Officer)'
+        : undefined;
+
       const res = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -535,7 +576,8 @@ function App() {
           name: newUserName,
           email: newUserEmail,
           role: newUserRole,
-          password: newUserPassword
+          password: newUserPassword,
+          designation: defaultDesignation
         })
       });
       const data = await res.json();
@@ -726,6 +768,25 @@ function App() {
     if (!printWin) return;
     const isOfficial = r.leave_type === 'Official duty';
     const d = r.details || {};
+    const clearances = Array.isArray(d.secretariatClearances) ? d.secretariatClearances : [];
+    const subjectOfficerClearance = clearances.find(c => c.role === 'reviewer') || (d.officerCompleted ? {
+      userName: d.officerCompletedBy?.name || 'Subject Officer',
+      userDesignation: 'විෂයභාර නිලධාරී (Subject Officer)',
+      signature: d.officerSignature,
+      remarks: d.officerRemarks || '',
+      date: d.officerCompletedAt?.slice(0, 10) || '',
+      forwardedToTitle: clearances[0]?.forwardedToTitle || 'Assistant Secretary'
+    } : null);
+    const intermediateClearances = clearances.filter(c => ['assistant_secretary', 'senior_assistant_secretary', 'additional_secretary'].includes(c.role));
+    const secretaryClearance = clearances.find(c => c.role === 'secretary' || c.decision === 'approve') || d.secretaryApproval || (r.status === 'Approved' ? {
+      userName: 'වරුෂණ ශ්‍රී ධනපාල',
+      userDesignation: 'ලේකම් (Secretary), සිවිල් ආරක්ෂක අමාත්‍යාංශය',
+      ministryName: 'සිවිල් ආරක්ෂක අමාත්‍යාංශය',
+      submissionText: 'ඉහත නම් සඳහන් නිලධාරියාගේ විදේශ නිවාඩු ඉල්ලීම නිර්දේශ කරනු ලබන අතර ඔබගේ අනුමැතිය සඳහා කාරුණිකව ඉදිරිපත් කරමි.',
+      date: r.updated_at?.slice(0, 10) || ''
+    } : null);
+    const presidentialDecision = d.presidentialDecision || (d.secretariatClearances && d.secretariatClearances.find(c => c.role === 'president'));
+
     printWin.document.write(`
       <!DOCTYPE html>
       <html>
@@ -751,6 +812,7 @@ function App() {
           </style>
         </head>
         <body>
+          <!-- PAGE 1: Application Particulars -->
           <div class="header">
             <h2>DEMOCRATIC SOCIALIST REPUBLIC OF SRI LANKA · ESTABLISHMENTS CODE</h2>
             <h1>${isOfficial ? 'FOREIGN TRAVEL PERMISSION · GENERAL 126 & APPENDIX 16' : 'APPLICATION FOR LEAVE OUT OF SRI LANKA · GENERAL 126'}</h1>
@@ -759,11 +821,14 @@ function App() {
             <div><strong>Application Ref:</strong> FV-${String(r.id).padStart(4, '0')}</div>
             <div><strong>Leave Nature:</strong> ${r.leave_type}</div>
             <div><strong>Status:</strong> ${r.status}</div>
+            <button class="no-print" onclick="window.opener && window.opener.printGeneral126Pdf ? window.opener.printGeneral126Pdf(${JSON.stringify(r).replace(/"/g, '&quot;')}) : window.print()" style="font-size: 9.5px; background: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-weight: 600;">
+              📄 General 126 පමණක් වෙනම PDF බාගන්න
+            </button>
           </div>
           <div class="sec-title">1. Officer and Service Particulars (General 126)</div>
           <div class="grid">
             <div class="item"><span>Full Name</span><strong>${r.applicant_name}</strong></div>
-            <div class="item"><span>Department / Institution</span><strong>${d.department || '—'}</strong></div>
+            <div class="item"><span>Department / Institution</span><strong>${d.department || r.department_name || '—'}</strong></div>
             <div class="item"><span>Post / Designation</span><strong>${d.designation || '—'}</strong></div>
             <div class="item"><span>Service & Grade</span><strong>${d.service || '—'} ${d.grade ? '(' + d.grade + ')' : ''}</strong></div>
             <div class="item"><span>Date of First Appointment</span><strong>${d.firstAppointmentDate || '—'}</strong></div>
@@ -804,6 +869,294 @@ function App() {
               <div style="font-size:9px;color:#64748b;margin-top:2px;">Digital Signature Verified</div>
             </div>
           </div>
+
+          <!-- PAGE 2: Department Head Endorsement (Est. Code XV 10:1) -->
+          ${d.departmentHeadEndorsement ? `
+            <div style="page-break-before: always; margin-top: 25px; border: 1.5px solid #0f172a; padding: 25px; position: relative;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px;">
+                <div style="font-size: 11px; line-height: 1.4;">
+                  <p style="margin: 0;">ලේකම්,</p>
+                  <p style="margin: 2px 0 0; text-decoration: underline;">${d.departmentHeadEndorsement.ministryName} අමාත්‍යාංශය</p>
+                  <p style="margin: 8px 0 0;">செயலாளர்,</p>
+                  <p style="margin: 2px 0 0; text-decoration: underline;">${d.departmentHeadEndorsement.ministryName} அமைச்சு</p>
+                  <p style="margin: 8px 0 0;">The Secretary,</p>
+                  <p style="margin: 2px 0 0; text-decoration: underline;">Ministry of ${d.departmentHeadEndorsement.ministryName}</p>
+                  <div style="margin-top: 8px;">
+                    <button class="no-print" onclick="window.opener && window.opener.printDepartmentHeadLetterPdf ? window.opener.printDepartmentHeadLetterPdf(${JSON.stringify(r).replace(/"/g, '&quot;')}) : (window.printDepartmentHeadLetterPdf ? window.printDepartmentHeadLetterPdf(${JSON.stringify(r).replace(/"/g, '&quot;')}) : window.print())" style="font-size: 9.5px; background: #faf5ff; color: #7e22ce; border: 1px solid #d8b4fe; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-weight: 600;">
+                      📄 ආයතන ප්‍රධානී ලිපිය වෙනම PDF
+                    </button>
+                  </div>
+                </div>
+
+                <div style="text-align: right; font-size: 11px; line-height: 1.3;">
+                  <div>මගේ අංකය &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\\</div>
+                  <div>எனது இல. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} &nbsp; <strong style="border-bottom: 1px dotted #000; padding: 0 10px;">${d.departmentHeadEndorsement.myNo}</strong></div>
+                  <div>My No. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/</div>
+                </div>
+              </div>
+
+              <!-- Clause 1 -->
+              <div style="margin-bottom: 16px; font-size: 11px; line-height: 1.5;">
+                <p style="margin: 0 0 6px;">
+                  1. <span style="border-bottom: 1px dotted #000; font-weight: bold; padding: 0 8px;">${r.applicant_name}</span> මහතාගේ/මහත්මියගේ/මෙනෙවියගේ නිවාඩු ඉල්ලුම් පත්‍රයේ පිටපත් දෙකක් මේ සමග ඉදිරිපත් කරමි. මේ නිලධාරියාගේ/නිලධාරිනියගේ වැඩ බැලීම සඳහා වැඩ පිළිවෙලක් යොදා ඇති බවත්, ඔහුට/ඇයට විරුද්ධව විනයානුකූල ක්‍රියා මාර්ගයක් දැනට පවත්වන්නේවත්, එසේ විනයානුකූල ක්‍රියා මාර්ගයක් ගැනීමට අදහස් කර ඇත්තේවත් නැති බව සහතික කරමි.
+                </p>
+                <p style="margin: 0 0 6px; color: #475569; font-size: 10px;">
+                  திரு./திருமதி/செல்வி <span style="border-bottom: 1px dotted #000; padding: 0 6px;">${r.applicant_name}</span> அவர்களின் விடுதலை விண்ணப்பத்தில் இரண்டு பிரதிகளை இத்துடன் அனுப்புகிறேன். இவ் உத்தியோகத்தரின் கடமைகளையாற்றுவதற்குப் பதில் ஒழுங்குகள் செய்யப்பட்டுள்ளனவெனவும் இவருக்கெதிராக ஒழுக்காற்று நடவடிக்கை எதுவும் முடிவுசெய்யப்படாமலிருக்கவில்லை அல்லது ஒழுக்காற்று நடவடிக்கையெதுவும் எடுக்க உத்தேசிக்கப்பட்டிருக்கவில்லை எனவும் இத்தால் உறுதிப்படுத்துகிறேன்.
+                </p>
+                <p style="margin: 0; font-size: 10px;">
+                  I forward herewith two copies of the leave application of Mr./Mrs./Miss <span style="border-bottom: 1px dotted #000; font-weight: bold; padding: 0 6px;">${r.applicant_name}</span>.<br>
+                  I certify that acting arrangements have been made and that there is no disciplinary action pending or contemplated against this officer.
+                </p>
+              </div>
+
+              <!-- Clause 2 -->
+              <div style="margin-bottom: 16px; font-size: 11px; line-height: 1.4;">
+                <p style="margin: 0 0 4px;">
+                  2. ආයතන සංග්‍රහයේ XV වැනි පරිච්ඡේදයේ 10: 1 වැනි වගන්තිය යටතේ අග්‍රාමාත්‍යවරයාගේ අවසරය ලබා ගෙන තිබේ.
+                </p>
+                <p style="margin: 0 0 4px; color: #475569; font-size: 10px;">
+                  தாபனக் கோவையின் XV ஆம் அத்தியாயத்தின் 10.1 ஆம் பிரிவின் பிரகாரம் பிரதம அமைச்சரின் அனுமதி பெறப்பட்டுள்ளது.
+                </p>
+                <p style="margin: 0; font-size: 10px;">
+                  Prime Minister's permission has been obtained in terms of Chapter XV - 10: 1 of the Establishments Code.
+                  <strong>(${d.departmentHeadEndorsement.primeMinisterPermission === 'obtained' ? 'Obtained' : 'Not Applicable'})</strong>
+                </p>
+              </div>
+
+              <!-- Clause 3 -->
+              <div style="margin-bottom: 24px; font-size: 11px; line-height: 1.5;">
+                <p style="margin: 0 0 4px;">
+                  3. නිවාඩු නිර්දේශ කරමි / නො කරමි * &nbsp;&nbsp;&nbsp; <strong>[ ${d.departmentHeadEndorsement.recommendation === 'recommended' ? 'නිවාඩු නිර්දේශ කරමි (RECOMMENDED)' : 'නිවාඩු නිර්දේශ නො කරමි (NOT RECOMMENDED)'} ]</strong>
+                </p>
+                <p style="margin: 0 0 4px; color: #475569; font-size: 10px;">
+                  விடுதலையை விதந்துரைக்கிறேன் / விதந்துரைக்கவில்லை *
+                </p>
+                <p style="margin: 0; font-size: 10px;">
+                  Leave is recommended/ not recommended. *
+                </p>
+                ${d.departmentHeadEndorsement.remarks ? `<p style="margin: 6px 0 0; font-size: 10px; font-style: italic;"><strong>Remarks:</strong> ${d.departmentHeadEndorsement.remarks}</p>` : ''}
+              </div>
+
+              <!-- Date and Signature -->
+              <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 30px;">
+                <div style="font-size: 11px; line-height: 1.3;">
+                  <div>දිනය &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\\</div>
+                  <div>திகதி &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} &nbsp; <strong style="border-bottom: 1px dotted #000; padding: 0 10px;">${d.departmentHeadEndorsement.date}</strong></div>
+                  <div>Date &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/</div>
+                </div>
+
+                <div style="text-align: center; font-size: 10px; line-height: 1.4;">
+                  ${d.departmentHeadEndorsement.signature ? `<img src="${d.departmentHeadEndorsement.signature}" style="max-height: 48px; display: block; margin: 0 auto 4px;" alt="Head Signature" />` : '<div style="height: 36px; border-bottom: 1px dotted #000; width: 180px; margin-bottom: 4px;"></div>'}
+                  <div style="border-top: 1px dotted #000; padding-top: 4px; font-weight: bold;">
+                    ${d.departmentHeadEndorsement.completedBy?.name || 'Head of Department'}<br>
+                    <span style="font-weight: normal; font-size: 9px;">${d.departmentHeadEndorsement.completedBy?.designation || ''} · ${d.departmentHeadEndorsement.completedBy?.department || ''}</span>
+                  </div>
+                  <div style="margin-top: 4px; font-size: 9.5px;">දෙපාර්තමේන්තු ප්‍රධානියාගේ අත්සන සහ නිල නාමය</div>
+                  <div style="color: #475569; font-size: 8.5px;">திணைக்களத் தலைவரின் கையொப்பமும் பதவிய்ப்பෙயரும்</div>
+                  <div style="font-size: 9px; font-style: italic;">Signature and Designation of Head of Department</div>
+                </div>
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- PAGE 3: Official Clearance Sheet (අවසර පත්‍රිකාව) -->
+          ${(subjectOfficerClearance || intermediateClearances.length > 0 || secretaryClearance) ? `
+            <div style="page-break-before: always; margin-top: 25px; border: 1.5px solid #0f172a; padding: 25px; position: relative;">
+              <!-- Header -->
+              <div style="text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 16px;">
+                <div style="font-size: 11px; font-weight: bold; color: #475569; letter-spacing: 0.5px;">DEMOCRATIC SOCIALIST REPUBLIC OF SRI LANKA · MINISTRY OF CIVIL SECURITY</div>
+                <div style="font-size: 15px; font-weight: bold; margin-top: 4px; text-transform: uppercase;">අවසර පත්‍රිකාව (CLEARANCE NOTE SHEET)</div>
+                <div style="font-size: 10px; color: #64748b; margin-top: 2px;">අමාත්‍යාංශ ලේකම් කාර්යාල නිල අත්සන් හා නිර්දේශ සටහන් (MINISTERIAL SECRETARIAT MINUTE TRAIL)</div>
+              </div>
+
+              <!-- Metadata bar -->
+              <div style="display: flex; justify-content: space-between; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; margin-bottom: 16px; font-size: 10.5px;">
+                <div><strong>යොමු අංකය (Ref No):</strong> FV-${String(r.id).padStart(4, '0')}</div>
+                <div><strong>අයදුම්කරු (Applicant):</strong> ${r.applicant_name}</div>
+                <div><strong>දෙපාර්තමේන්තුව (Dept):</strong> ${d.department || r.department_name || '—'}</div>
+              </div>
+
+              <!-- Part 1: Subject Officer Section -->
+              ${subjectOfficerClearance ? `
+                <div style="margin-bottom: 16px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 12px; background: #ffffff;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 8px;">
+                    <div style="font-size: 11px; font-weight: bold; color: #1e3a8a;">
+                      1. විෂයභාර නිලධාරී තක්සේරුව සහ සටහන (Subject Officer Assessment & Minute)
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      ${subjectOfficerClearance.forwardedToTitle ? `<span style="font-size: 9.5px; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 10px; font-weight: 600;">➔ ${subjectOfficerClearance.forwardedToTitle}</span>` : ''}
+                      <button class="no-print" onclick="window.opener && window.opener.printSubjectOfficerPdf ? window.opener.printSubjectOfficerPdf(${JSON.stringify(r).replace(/"/g, '&quot;')}) : window.print()" style="font-size: 9.5px; background: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-weight: 600;">
+                        📄 වෙනම PDF බාගන්න
+                      </button>
+                    </div>
+                  </div>
+
+                  ${d.officerAssessment ? `
+                    <table style="width:100%; border-collapse:collapse; margin:6px 0 10px; font-size:10px;">
+                      <thead>
+                        <tr style="background:#f1f5f9;">
+                          <th style="border:1px solid #cbd5e1; padding:3px 6px; text-align:left;">Leave Classification / නිවාඩු වර්ගය</th>
+                          <th style="border:1px solid #cbd5e1; padding:3px 6px; text-align:center; width:80px;">Months</th>
+                          <th style="border:1px solid #cbd5e1; padding:3px 6px; text-align:center; width:80px;">Days</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td style="border:1px solid #e2e8f0; padding:3px 6px;">Vacation Leave / නිවාඩු ශේෂය</td>
+                          <td style="border:1px solid #e2e8f0; padding:3px 6px; text-align:center;">${d.officerAssessment?.vacationLeave?.months || 0}</td>
+                          <td style="border:1px solid #e2e8f0; padding:3px 6px; text-align:center;">${d.officerAssessment?.vacationLeave?.days || 0}</td>
+                        </tr>
+                        <tr>
+                          <td style="border:1px solid #e2e8f0; padding:3px 6px;">Commuted half-pay leave</td>
+                          <td style="border:1px solid #e2e8f0; padding:3px 6px; text-align:center;">${d.officerAssessment?.commutedHalfPay?.months || 0}</td>
+                          <td style="border:1px solid #e2e8f0; padding:3px 6px; text-align:center;">${d.officerAssessment?.commutedHalfPay?.days || 0}</td>
+                        </tr>
+                        <tr>
+                          <td style="border:1px solid #e2e8f0; padding:3px 6px;">Half-Pay leave / අර්ධ වැටුප් නිවාඩු</td>
+                          <td style="border:1px solid #e2e8f0; padding:3px 6px; text-align:center;">${d.officerAssessment?.halfPay?.months || 0}</td>
+                          <td style="border:1px solid #e2e8f0; padding:3px 6px; text-align:center;">${d.officerAssessment?.halfPay?.days || 0}</td>
+                        </tr>
+                        <tr>
+                          <td style="border:1px solid #e2e8f0; padding:3px 6px;">No-Pay leave / වැටුප් රහිත නිවාඩු</td>
+                          <td style="border:1px solid #e2e8f0; padding:3px 6px; text-align:center;">${d.officerAssessment?.noPay?.months || 0}</td>
+                          <td style="border:1px solid #e2e8f0; padding:3px 6px; text-align:center;">${d.officerAssessment?.noPay?.days || 0}</td>
+                        </tr>
+                        <tr style="font-weight:bold; background:#eff6ff;">
+                          <td style="border:1px solid #cbd5e1; padding:3px 6px;">Total / එකතුව</td>
+                          <td style="border:1px solid #cbd5e1; padding:3px 6px; text-align:center;">${d.officerAssessment?.total?.months || 0}</td>
+                          <td style="border:1px solid #cbd5e1; padding:3px 6px; text-align:center;">${d.officerAssessment?.total?.days || 0}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  ` : ''}
+
+                  ${subjectOfficerClearance.remarks ? `
+                    <div style="margin: 6px 0; font-size: 10.5px; background: #f8fafc; padding: 6px 10px; border: 1px solid #f1f5f9; border-radius: 4px;">
+                      <strong>නිල සටහන / නිර්දේශය:</strong> ${subjectOfficerClearance.remarks}
+                    </div>
+                  ` : ''}
+
+                  <!-- Subject Officer Name, Designation, Date Signed & Signature -->
+                  <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 10px; padding-top: 8px; border-top: 1px dotted #cbd5e1;">
+                    <div style="font-size: 10.5px; line-height: 1.5;">
+                      <div><strong>නම (Name):</strong> ${subjectOfficerClearance.userName || 'Subject Officer'}</div>
+                      <div><strong>තනතුර (Designation):</strong> ${subjectOfficerClearance.userDesignation || 'විෂයභාර නිලධාරී (Subject Officer)'}</div>
+                      <div><strong>අත්සන් කළ දිනය (Date Signed):</strong> ${subjectOfficerClearance.date || '—'}</div>
+                    </div>
+                    <div style="text-align: right;">
+                      <div style="font-size: 9px; color: #64748b; margin-bottom: 2px;">විෂයභාර නිලධාරී අත්සන (Signature):</div>
+                      ${subjectOfficerClearance.signature ? `<img src="${subjectOfficerClearance.signature}" style="max-height: 42px; max-width: 150px; border: 1px dashed #cbd5e1; padding: 2px;" alt="Subject Officer Signature" />` : '<div style="height: 34px; border-bottom: 1px dotted #000; width: 140px;"></div>'}
+                    </div>
+                  </div>
+                </div>
+              ` : ''}
+
+              <!-- Official Document Review Statement -->
+              <div style="border: 1.5px solid #2563eb; background: #eff6ff; border-radius: 4px; padding: 10px 14px; margin-bottom: 14px;">
+                <div style="font-size: 10.5px; line-height: 1.5; color: #1e3a8a; font-style: italic; font-weight: 600;">
+                  "All relevant documents have been carefully examined and thoroughly reviewed to verify the accuracy and completeness of the information provided. The contents of the documents have been duly considered in accordance with the applicable rules, regulations, and established administrative procedures."
+                </div>
+              </div>
+
+              <!-- Part 2: Intermediate Secretariat Officers (Assistant Secretary, Senior Assistant Secretary, Additional Secretary) -->
+              ${intermediateClearances.length > 0 ? `
+                <div style="margin-bottom: 16px;">
+                  <div style="font-size: 11px; font-weight: bold; color: #1e3a8a; margin-bottom: 8px;">
+                    2. අමාත්‍යාංශ ලේකම් කාර්යාල නිලධාරීන්ගේ නිර්දේශ හා සටහන් (Ministry Secretariat Recommendations)
+                  </div>
+                  ${intermediateClearances.map((c) => `
+                    <div style="margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 10px; background: #ffffff;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px; margin-bottom: 6px;">
+                        <strong style="font-size: 11px; color: #0f172a;">${c.title} ${c.titleSi ? '(' + c.titleSi + ')' : ''}</strong>
+                        ${c.forwardedToTitle ? `<span style="font-size: 9.5px; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 10px; font-weight: 600;">➔ ${c.forwardedToTitle}</span>` : ''}
+                      </div>
+                      ${c.remarks ? `
+                        <div style="margin: 4px 0 8px; font-size: 10.5px; background: #f8fafc; padding: 6px 10px; border: 1px solid #f1f5f9; border-radius: 4px;">
+                          <strong>නිල සටහන / නිර්දේශය:</strong> ${c.remarks}
+                        </div>
+                      ` : ''}
+                      <div style="display: flex; justify-content: space-between; align-items: flex-end; padding-top: 6px; border-top: 1px dotted #cbd5e1;">
+                        <div style="font-size: 10px; line-height: 1.5;">
+                          <div><strong>නම (Name):</strong> ${c.userName}</div>
+                          <div><strong>තනතුර (Designation):</strong> ${c.userDesignation || c.titleSi || c.title}</div>
+                          <div><strong>අත්සන් කළ දිනය (Date Signed):</strong> ${c.date || c.timestamp?.slice(0, 10) || '—'}</div>
+                        </div>
+                        <div style="text-align: right;">
+                          <div style="font-size: 9px; color: #64748b; margin-bottom: 2px;">අත්සන (Signature):</div>
+                          ${c.signature ? `<img src="${c.signature}" style="max-height: 40px; max-width: 140px; border: 1px dashed #cbd5e1; padding: 2px;" alt="Signature" />` : '<div style="height: 32px; border-bottom: 1px dotted #000; width: 130px;"></div>'}
+                        </div>
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              ` : ''}
+
+              <!-- Part 3: Ministry Secretary Submission & Signature Section -->
+              <div style="border: 1.5px solid #0f172a; border-radius: 4px; padding: 14px 16px; background: #f8fafc; margin-top: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <div style="font-size: 12px; font-weight: bold; color: #0f172a;">
+                    <u>ගරු අමාත්‍යාංශය</u>
+                  </div>
+                  <button class="no-print" onclick="window.opener && window.opener.printNoteSheetMinisterialPdf ? window.opener.printNoteSheetMinisterialPdf(${JSON.stringify(r).replace(/"/g, '&quot;')}) : (window.printNoteSheetMinisterialPdf ? window.printNoteSheetMinisterialPdf(${JSON.stringify(r).replace(/"/g, '&quot;')}) : window.print())" style="font-size: 9.5px; background: #f0fdf4; color: #166534; border: 1px solid #86efac; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-weight: 600;">
+                    📄 අවසර පත්‍රිකාව වෙනම PDF
+                  </button>
+                </div>
+                <div style="font-size: 11px; line-height: 1.6; color: #0f172a; margin-bottom: 16px;">
+                  ඉහත නම් සඳහන් නිලධාරියාගේ විදේශ නිවාඩු ඉල්ලීම නිර්දේශ කරනු ලබන අතර ඔබගේ අනුමැතිය සඳහා කාරුණිකව ඉදිරිපත් කරමි.
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; padding-top: 12px; border-top: 1px dashed #94a3b8;">
+                  <div style="font-size: 10.5px; line-height: 1.5;">
+                    <div><strong>දිනය (Date):</strong> ${secretaryClearance?.date || secretaryClearance?.timestamp?.slice(0, 10) || (r.status === 'Approved' ? r.updated_at?.slice(0, 10) : '........................')}</div>
+                  </div>
+                  <div style="text-align: center; font-size: 10.5px; line-height: 1.4;">
+                    ${secretaryClearance?.signature ? `<img src="${secretaryClearance.signature}" style="max-height: 48px; max-width: 170px; display: block; margin: 0 auto 4px;" alt="Secretary Signature" />` : '<div style="height: 36px; border-bottom: 1px dotted #000; width: 170px; margin-bottom: 4px;"></div>'}
+                    <div style="border-top: 1px dotted #000; padding-top: 4px; font-weight: bold;">
+                      ${secretaryClearance?.userName || secretaryClearance?.signatoryName || 'වරුෂණ ශ්‍රී ධනපාල'}<br>
+                      <span style="font-weight: normal; font-size: 9.5px;">ලේකම්</span><br>
+                      <span style="font-weight: normal; font-size: 9.5px;">සිවිල් ආරක්ෂක අමාත්‍යාංශය</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Part 4: Presidential Order Section (අතිගරු ජනාධිපතිතුමා) -->
+              <div style="border: 2px solid #0f172a; border-radius: 4px; padding: 12px 14px; background: #ffffff; margin-top: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-bottom: 8px;">
+                  <span style="font-size: 11px; font-weight: 800; color: #0f172a; text-transform: uppercase;">අතිගරු ජනාධිපතිතුමාගේ තීරණය (PRESIDENTIAL ORDER)</span>
+                  <span style="font-size: 9.5px; color: #64748b; font-weight: 600;">Final Constitutional Authority</span>
+                </div>
+                <div style="margin: 6px 0 10px; font-size: 12px; display: flex; gap: 20px; align-items: center;">
+                  <div style="font-weight: 700; color: ${(presidentialDecision?.decision === 'approve' || (!presidentialDecision && r.status === 'Approved')) ? '#15803d' : '#64748b'};">
+                    <span style="font-size: 14px;">${(presidentialDecision?.decision === 'approve' || (!presidentialDecision && r.status === 'Approved')) ? '☑' : '☐'}</span>
+                    <span style="margin-left: 4px;">"නිවාඩුව අනුමත කරමි"</span>
+                  </div>
+                  <div style="font-weight: 700; color: ${(presidentialDecision?.decision === 'reject' || (!presidentialDecision && r.status === 'Rejected')) ? '#b91c1c' : '#64748b'};">
+                    <span style="font-size: 14px;">${(presidentialDecision?.decision === 'reject' || (!presidentialDecision && r.status === 'Rejected')) ? '☑' : '☐'}</span>
+                    <span style="margin-left: 4px;">"නිවාඩු අනුමත නොකරමි"</span>
+                  </div>
+                </div>
+                ${presidentialDecision?.remarks ? `
+                  <div style="margin-bottom: 8px; font-size: 10px; background: #f8fafc; padding: 5px 8px; border: 1px solid #e2e8f0; border-radius: 4px;">
+                    <strong>විශේෂ සටහන් / Directives:</strong> ${presidentialDecision.remarks}
+                  </div>
+                ` : ''}
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; padding-top: 8px; border-top: 1px dashed #cbd5e1;">
+                  <div style="font-size: 10px; line-height: 1.6; color: #1e293b;">
+                    <div><strong>නම (Name):</strong> ${presidentialDecision?.userName || ((presidentialDecision || r.status === 'Approved') ? 'අතිගරු ජනාධිපතිතුමා' : '........................................')}</div>
+                    <div><strong>දිනය (Date):</strong> ${presidentialDecision?.date || presidentialDecision?.timestamp?.slice(0, 10) || (r.status === 'Approved' ? r.updated_at?.slice(0, 10) : '........................')}</div>
+                  </div>
+                  <div style="text-align: center; font-size: 10px; line-height: 1.35;">
+                    ${presidentialDecision?.signature ? `<img src="${presidentialDecision.signature}" style="max-height: 46px; max-width: 170px; display: block; margin: 0 auto 4px;" alt="President Signature" />` : '<div style="height: 36px; border-bottom: 1px dotted #000; width: 170px; margin: 0 auto 4px;"></div>'}
+                    <div style="border-top: 1px dotted #000; padding-top: 4px; font-weight: bold;">
+                      (Name / Date / signature)<br>
+                      <span style="font-size: 11px; color: #0f172a;">ජනාධිපති සහ ඩිජිටල් ආර්ථික අමාත්‍යාංශය</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ` : ''}
           <script>
             window.onload = function() { window.print(); };
           </script>
@@ -832,9 +1185,11 @@ function App() {
 
   const isApplicant = user.role === 'applicant';
   const isAdmin = user.role === 'admin';
+  const isDeptHead = user.role === 'department_head';
   const isReviewer = user.role === 'reviewer';
+  const isSecretariat = ['assistant_secretary', 'senior_assistant_secretary', 'additional_secretary', 'secretary'].includes(user.role);
   const isAuthority = ['authorized_official', 'minister', 'president'].includes(user.role);
-  const canReviewOrApprove = isAdmin || isReviewer || isAuthority;
+  const canReviewOrApprove = isAdmin || isDeptHead || isReviewer || isSecretariat || isAuthority;
 
   // Counts
   const pendingRequests = requests.filter((r) => r.status.startsWith('Pending'));
@@ -848,10 +1203,11 @@ function App() {
   const returnedCount = returnedRequests.length;
 
   // Stage breakdown
+  const deptHeadPending = requests.filter((r) => r.status === 'Pending Department Head Approval').length;
   const reviewPending = requests.filter((r) => r.status === 'Pending Review').length;
-  const officialPending = requests.filter((r) => r.status === 'Pending Official Authorization').length;
-  const ministerPending = requests.filter((r) => r.status === 'Pending Minister Approval').length;
-  const presidentPending = requests.filter((r) => r.status === 'Pending Presidential Approval').length;
+  const secretariatPending = requests.filter((r) => ['Pending Assistant Secretary Review', 'Pending Senior Assistant Secretary Review', 'Pending Additional Secretary Review'].includes(r.status)).length;
+  const secretaryPending = requests.filter((r) => r.status === 'Pending Secretary Approval').length;
+  const presidentialPending = requests.filter((r) => r.status === 'Pending Presidential Approval').length;
 
   // Approvals tab filtered requests
   const approvalsList = requests.filter((r) => {
@@ -860,6 +1216,8 @@ function App() {
     let matchesStage = true;
     if (approvalStageFilter === 'pending') {
       matchesStage = r.status.startsWith('Pending');
+    } else if (approvalStageFilter === 'secretariat') {
+      matchesStage = ['Pending Assistant Secretary Review', 'Pending Senior Assistant Secretary Review', 'Pending Additional Secretary Review'].includes(r.status);
     } else if (approvalStageFilter !== 'all') {
       matchesStage = r.status === approvalStageFilter;
     }
@@ -1190,51 +1548,63 @@ function App() {
                 </div>
                 <div className="pipeline-flow" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
                   <div
+                    className={`pipeline-stage ${deptHeadPending > 0 ? 'has-pending' : ''}`}
+                    onClick={() => { setApprovalStageFilter('Pending Department Head Approval'); setActiveNav('approvals'); }}
+                  >
+                    <div className="pipeline-stage-top">
+                      <span className="stage-num">1</span>
+                      <span className="stage-count">{deptHeadPending}</span>
+                    </div>
+                    <span className="stage-title">{t.roleNames.department_head || 'Dept Head'}</span>
+                    <span className="stage-desc">{language === 'en' ? 'Est. Code XV 10:1' : 'ආයතන ප්‍රධානියා'}</span>
+                  </div>
+
+                  <div
                     className={`pipeline-stage ${reviewPending > 0 ? 'has-pending' : ''}`}
                     onClick={() => { setApprovalStageFilter('Pending Review'); setActiveNav('approvals'); }}
                   >
                     <div className="pipeline-stage-top">
-                      <span className="stage-num">1</span>
+                      <span className="stage-num">2</span>
                       <span className="stage-count">{reviewPending}</span>
                     </div>
                     <span className="stage-title">{t.roleNames.reviewer}</span>
-                    <span className="stage-desc">{language === 'en' ? 'Verify docs & route' : 'ලිපිගොනු පරීක්ෂාව'}</span>
+                    <span className="stage-desc">{language === 'en' ? 'Assessment & Note Sheet' : 'විෂයභාර නිලධාරී'}</span>
                   </div>
 
                   <div
-                    className={`pipeline-stage ${officialPending > 0 ? 'has-pending' : ''}`}
-                    onClick={() => { setApprovalStageFilter('Pending Official Authorization'); setActiveNav('approvals'); }}
-                  >
-                    <div className="pipeline-stage-top">
-                      <span className="stage-num">2</span>
-                      <span className="stage-count">{officialPending}</span>
-                    </div>
-                    <span className="stage-title">{t.roleNames.authorized_official}</span>
-                    <span className="stage-desc">{language === 'en' ? 'Dept Head / Secretary' : 'දෙපාර්තමේන්තු ප්‍රධානී'}</span>
-                  </div>
-
-                  <div
-                    className={`pipeline-stage ${ministerPending > 0 ? 'has-pending' : ''}`}
-                    onClick={() => { setApprovalStageFilter('Pending Minister Approval'); setActiveNav('approvals'); }}
+                    className={`pipeline-stage ${secretariatPending > 0 ? 'has-pending' : ''}`}
+                    onClick={() => { setApprovalStageFilter('secretariat'); setActiveNav('approvals'); }}
                   >
                     <div className="pipeline-stage-top">
                       <span className="stage-num">3</span>
-                      <span className="stage-count">{ministerPending}</span>
+                      <span className="stage-count">{secretariatPending}</span>
                     </div>
-                    <span className="stage-title">{t.roleNames.minister}</span>
-                    <span className="stage-desc">{language === 'en' ? 'Ministerial clearance' : 'අමාත්‍ය අවසරය'}</span>
+                    <span className="stage-title">{language === 'en' ? 'Secretariat' : 'ලේකම් කාර්යාලය'}</span>
+                    <span className="stage-desc">{language === 'en' ? 'Asst Sec ➔ Addl Sec' : 'සහකාර ➔ අතිරේක ලේකම්'}</span>
                   </div>
 
                   <div
-                    className={`pipeline-stage ${presidentPending > 0 ? 'has-pending' : ''}`}
-                    onClick={() => { setApprovalStageFilter('Pending Presidential Approval'); setActiveNav('approvals'); }}
+                    className={`pipeline-stage ${secretaryPending > 0 ? 'has-pending' : ''}`}
+                    onClick={() => { setApprovalStageFilter('Pending Secretary Approval'); setActiveNav('approvals'); }}
                   >
                     <div className="pipeline-stage-top">
                       <span className="stage-num">4</span>
-                      <span className="stage-count">{presidentPending}</span>
+                      <span className="stage-count">{secretaryPending}</span>
                     </div>
-                    <span className="stage-title">{t.roleNames.president}</span>
-                    <span className="stage-desc">{language === 'en' ? 'Presidential office' : 'ජනාධිපති ලේකම්'}</span>
+                    <span className="stage-title">{t.roleNames.secretary || 'Secretary'}</span>
+                    <span className="stage-desc">{language === 'en' ? 'Submits to President' : 'ජනාධිපතිතුමා වෙත ඉදිරිපත්'}</span>
+                  </div>
+
+                  <div
+                    className={`pipeline-stage ${presidentialPending > 0 ? 'has-pending' : ''}`}
+                    onClick={() => { setApprovalStageFilter('Pending Presidential Approval'); setActiveNav('approvals'); }}
+                  >
+                    <div className="pipeline-stage-top">
+                      <span className="stage-num">5</span>
+                      <span className="stage-count">{presidentialPending}</span>
+                    </div>
+                    <span className="stage-title">{language === 'en' ? 'President' : 'ජනාධිපති'}</span>
+                    <span className="stage-desc">{language === 'en' ? 'Final Executive Decision' : 'අවසාන අනුමැතිය'}</span>
                   </div>
 
                   <div
@@ -1407,6 +1777,13 @@ function App() {
                         <span style={{ background: '#edf3ff', color: '#1552d1' }}>{pendingCount}</span>
                       </button>
                       <button
+                        className={approvalStageFilter === 'Pending Department Head Approval' ? 'tab selected' : 'tab'}
+                        onClick={() => setApprovalStageFilter('Pending Department Head Approval')}
+                      >
+                        {t.roleNames.department_head || 'Dept Head'}
+                        <span>{deptHeadPending}</span>
+                      </button>
+                      <button
                         className={approvalStageFilter === 'Pending Review' ? 'tab selected' : 'tab'}
                         onClick={() => setApprovalStageFilter('Pending Review')}
                       >
@@ -1414,25 +1791,25 @@ function App() {
                         <span>{reviewPending}</span>
                       </button>
                       <button
-                        className={approvalStageFilter === 'Pending Official Authorization' ? 'tab selected' : 'tab'}
-                        onClick={() => setApprovalStageFilter('Pending Official Authorization')}
+                        className={approvalStageFilter === 'secretariat' ? 'tab selected' : 'tab'}
+                        onClick={() => setApprovalStageFilter('secretariat')}
                       >
-                        {t.roleNames.authorized_official}
-                        <span>{officialPending}</span>
+                        {language === 'en' ? 'Secretariat' : 'ලේකම් කාර්යාලය'}
+                        <span>{secretariatPending}</span>
                       </button>
                       <button
-                        className={approvalStageFilter === 'Pending Minister Approval' ? 'tab selected' : 'tab'}
-                        onClick={() => setApprovalStageFilter('Pending Minister Approval')}
+                        className={approvalStageFilter === 'Pending Secretary Approval' ? 'tab selected' : 'tab'}
+                        onClick={() => setApprovalStageFilter('Pending Secretary Approval')}
                       >
-                        {t.roleNames.minister}
-                        <span>{ministerPending}</span>
+                        {t.roleNames.secretary || 'Secretary'}
+                        <span>{secretaryPending}</span>
                       </button>
                       <button
                         className={approvalStageFilter === 'Pending Presidential Approval' ? 'tab selected' : 'tab'}
                         onClick={() => setApprovalStageFilter('Pending Presidential Approval')}
                       >
-                        {t.roleNames.president}
-                        <span>{presidentPending}</span>
+                        {language === 'en' ? 'President' : 'ජනාධිපති'}
+                        <span>{presidentialPending}</span>
                       </button>
                     </div>
 
@@ -1629,13 +2006,26 @@ function App() {
                       {t.designatedRole} *
                       <select
                         value={newUserRole}
-                        onChange={(e) => setNewUserRole(e.target.value)}
+                        onChange={(e) => {
+                          const r = e.target.value;
+                          setNewUserRole(r);
+                          if (r === 'president' && !newUserName) {
+                            setNewUserName('අතිගරු ජනාධිපතිතුමා');
+                          } else if (r === 'secretary' && !newUserName) {
+                            setNewUserName('වරුෂණ ශ්‍රී ධනපාල');
+                          }
+                        }}
                       >
                         <option value="applicant">{t.roleNames.applicant} (Officer submitting requests)</option>
-                        <option value="reviewer">{t.roleNames.reviewer} (Verifies & routes to authorities)</option>
-                        <option value="authorized_official">{t.roleNames.authorized_official} (Dept Head / Secretary)</option>
+                        <option value="department_head">{t.roleNames.department_head} (Head of Dept - Est. Code XV 10:1)</option>
+                        <option value="reviewer">{t.roleNames.reviewer} (Subject Officer - Note Sheet / Verification)</option>
+                        <option value="assistant_secretary">{t.roleNames.assistant_secretary}</option>
+                        <option value="senior_assistant_secretary">{t.roleNames.senior_assistant_secretary}</option>
+                        <option value="additional_secretary">{t.roleNames.additional_secretary}</option>
+                        <option value="secretary">{t.roleNames.secretary} (Submits to Hon. President)</option>
+                        <option value="president">{t.roleNames.president} (Final Approval & Executive Order)</option>
                         <option value="minister">{t.roleNames.minister} (Cabinet Minister)</option>
-                        <option value="president">{t.roleNames.president} (Presidential Secretariat)</option>
+                        <option value="authorized_official">{t.roleNames.authorized_official} (Director General / Official)</option>
                         <option value="admin">{t.roleNames.admin} (Full Administrator)</option>
                       </select>
                     </label>
@@ -2042,6 +2432,7 @@ function App() {
           token={token}
           onClose={() => setSelected(null)}
           onPrintApplication={handlePrintApplicationPdf}
+          onPrintOfficerAssessment={printSubjectOfficerPdf}
           onChanged={() => {
             setSelected(null);
             loadRequests();
@@ -2379,56 +2770,12 @@ function AuthPage({ language, setLanguage, t, onLogin }) {
 // =========================================================================
 // DETAIL MODAL: Reviewer Verification & Executive Authority Clearance
 // =========================================================================
-function DetailModal({ request, user, t, language, token, onClose, onChanged, onPrintApplication }) {
-  const [note, setNote] = useState('');
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  const isAdmin = user.role === 'admin';
-  const isReviewer = user.role === 'reviewer';
-  const isOfficial = user.role === 'authorized_official';
-  const isMinister = user.role === 'minister';
-  const isPresident = user.role === 'president';
-
-  // Can this user act on the request?
-  const isReviewerStage = request.status === 'Pending Review';
-  const isOfficialStage = request.status === 'Pending Official Authorization';
-  const isMinisterStage = request.status === 'Pending Minister Approval';
-  const isPresidentStage = request.status === 'Pending Presidential Approval';
-
-  const canReview = (isReviewer || isAdmin) && isReviewerStage;
-  const canAuthorizeOfficial = (isOfficial || isAdmin) && isOfficialStage;
-  const canAuthorizeMinister = (isMinister || isAdmin) && isMinisterStage;
-  const canAuthorizePresident = (isPresident || isAdmin) && isPresidentStage;
-  const canAdminAct = isAdmin && request.status.startsWith('Pending');
-
-  const canAct = canReview || canAuthorizeOfficial || canAuthorizeMinister || canAuthorizePresident || canAdminAct;
-
-  async function decide(decision, targetAuthority = null) {
-    setError('');
-    setBusy(true);
-    try {
-      const payload = { decision, note };
-      if (targetAuthority) payload.targetAuthority = targetAuthority;
-
-      const response = await fetch(`/api/requests/${request.id}/decision`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(payload)
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to record decision');
-      onChanged();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
+function DetailModal({ request, user, t, language, token, onClose, onChanged, onPrintApplication, onPrintOfficerAssessment }) {
+  const hasOfficerSection = Boolean(request.details?.officerCompleted || request.details?.officerAssessment);
 
   return (
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section className="detail-modal" style={{ width: 'min(700px, 100%)' }}>
+      <section className="detail-modal" style={{ width: 'min(880px, 100%)', maxHeight: '92vh', overflowY: 'auto' }}>
         <header className="modal-header">
           <div>
             <div className="eyebrow">FV-{String(request.id).padStart(4, '0')} · {t.request}</div>
@@ -2441,13 +2788,99 @@ function DetailModal({ request, user, t, language, token, onClose, onChanged, on
                 type="button"
                 className="secondary-button"
                 onClick={() => onPrintApplication(request)}
-                title={language === 'si' ? 'අයදුම්පත PDF ලෙස බාගන්න / මුද්‍රණය කරන්න' : 'Download / Print Application PDF'}
+                title={language === 'si' ? 'සම්පූර්ණ අයදුම්පත PDF ලෙස බාගන්න / මුද්‍රණය කරන්න' : 'Download / Print Full Application PDF'}
                 style={{ height: '32px', padding: '0 12px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               >
                 <FileDown size={14} />
-                <span>{language === 'si' ? 'PDF බාගන්න' : 'Download PDF'}</span>
+                <span>{language === 'si' ? 'සම්පූර්ණ PDF' : 'Full PDF'}</span>
               </button>
             )}
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => printGeneral126Pdf(request)}
+              title={language === 'si' ? 'General 126 (පුද්ගලික පිටුව) වෙනම PDF ලෙස බාගන්න' : 'Download General 126 Personal Page as Separate PDF'}
+              style={{
+                height: '32px',
+                padding: '0 12px',
+                fontSize: '11px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderColor: '#60a5fa',
+                background: '#eff6ff',
+                color: '#1e40af',
+                fontWeight: 600
+              }}
+            >
+              <FileDown size={14} />
+              <span>{language === 'si' ? 'General 126 PDF' : 'General 126 PDF'}</span>
+            </button>
+            {hasOfficerSection && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => onPrintOfficerAssessment ? onPrintOfficerAssessment(request) : printOfficeUseOnlyPdf(request)}
+                title={language === 'si' ? 'For Office Use Only (Particulars of Available Leave) පිටුව වෙනම PDF ලෙස බාගන්න' : 'Download For Office Use Only (Particulars of Available Leave) as Separate PDF'}
+                style={{
+                  height: '32px',
+                  padding: '0 12px',
+                  fontSize: '11px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderColor: '#93c5fd',
+                  background: '#eff6ff',
+                  color: '#1d4ed8',
+                  fontWeight: 600
+                }}
+              >
+                <FileDown size={14} />
+                <span>{language === 'si' ? 'Office Use (නිවාඩු විස්තර) PDF' : 'For Office Use Only PDF'}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => printDepartmentHeadLetterPdf(request)}
+              title={language === 'si' ? 'දෙපාර්තමේන්තු ප්‍රධානියා පුරවනු ලබන ලිපිය වෙනම PDF ලෙස බාගන්න' : 'Download Head of Department Forwarding Letter as Separate PDF'}
+              style={{
+                height: '32px',
+                padding: '0 12px',
+                fontSize: '11px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderColor: '#c084fc',
+                background: '#faf5ff',
+                color: '#7e22ce',
+                fontWeight: 600
+              }}
+            >
+              <FileDown size={14} />
+              <span>{language === 'si' ? 'ආයතන ප්‍රධානී ලිපිය PDF' : 'Dept Head Letter PDF'}</span>
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => printNoteSheetMinisterialPdf(request)}
+              title={language === 'si' ? 'අවසර පත්‍රිකාව සහ අමාත්‍ය ඉදිරිපත් කිරීම වෙනම PDF ලෙස බාගන්න' : 'Download Clearance Sheet & Ministerial Submission PDF'}
+              style={{
+                height: '32px',
+                padding: '0 12px',
+                fontSize: '11px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderColor: '#38bdf8',
+                background: '#f0f9ff',
+                color: '#0369a1',
+                fontWeight: 600
+              }}
+            >
+              <FileDown size={14} />
+              <span>{language === 'si' ? 'අවසර පත්‍රිකාව PDF' : 'Clearance Sheet PDF'}</span>
+            </button>
             <button className="icon-button" onClick={onClose} aria-label={t.close}>
               <X size={19} />
             </button>
@@ -2470,7 +2903,13 @@ function DetailModal({ request, user, t, language, token, onClose, onChanged, on
             </div>
           </div>
 
-          <RequestDetails details={request.details} language={language} />
+          {/* Form 126 & Form 16 Applicant Particulars */}
+          <RequestDetails
+            details={request.details}
+            language={language}
+            request={request}
+            onPrintOfficerAssessment={onPrintOfficerAssessment || printSubjectOfficerPdf}
+          />
 
           <div className="detail-status">
             <span className={`status-badge ${getStatusBadgeClass(request.status)}`}>
@@ -2481,14 +2920,75 @@ function DetailModal({ request, user, t, language, token, onClose, onChanged, on
           </div>
 
           {request.signature && (
-            <div className="saved-signature">
-              <span>{t.signature}</span>
-              <img src={request.signature} alt={t.signature} />
+            <div className="saved-signature" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <span>{t.signature}</span>
+                <img src={request.signature} alt={t.signature} />
+              </div>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => printGeneral126Pdf(request)}
+                title={language === 'si' ? 'General 126 පුද්ගලික අයදුම්පත PDF ලෙස බාගන්න' : 'Download General 126 Personal Leave PDF'}
+                style={{
+                  height: '32px',
+                  padding: '0 12px',
+                  fontSize: '11px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderColor: '#93c5fd',
+                  background: '#eff6ff',
+                  color: '#1d4ed8',
+                  fontWeight: 600
+                }}
+              >
+                <FileDown size={13} />
+                <span>{language === 'si' ? '📄 General 126 පිටුව PDF බාගන්න' : '📄 Download General 126 PDF'}</span>
+              </button>
             </div>
           )}
 
+          {/* 1. Department Head Institutional Endorsement (General 126 Step 3 / Est. Code XV 10:1) */}
+          <DepartmentHeadEndorsementSection
+            request={request}
+            user={user}
+            language={language}
+            token={token}
+            onSaved={onChanged}
+          />
+
+          {/* 2. Subject Officer Leave Classification & Note Sheet */}
+          <OfficerAssessmentSection
+            request={request}
+            user={user}
+            language={language}
+            token={token}
+            onSaved={onChanged}
+            onPrintOfficerAssessment={onPrintOfficerAssessment || printSubjectOfficerPdf}
+          />
+
+          {/* 3. Ministry Secretariat Sequential Hierarchy Clearance & Secretary Final Approval */}
+          <SecretariatMinuteTrailSection
+            request={request}
+            user={user}
+            language={language}
+            token={token}
+            onSaved={onChanged}
+            onPrintOfficerAssessment={onPrintOfficerAssessment || printSubjectOfficerPdf}
+          />
+
+          {/* 4. Presidential Final Decision & Order */}
+          <PresidentialOrderSection
+            request={request}
+            user={user}
+            language={language}
+            token={token}
+            onSaved={onChanged}
+          />
+
           {/* Timeline */}
-          <div className="timeline">
+          <div className="timeline" style={{ marginTop: '20px' }}>
             <h3>{t.timeline}</h3>
             <div className="timeline-row">
               <span className="timeline-dot done"><Check size={12} /></span>
@@ -2511,128 +3011,6 @@ function DetailModal({ request, user, t, language, token, onClose, onChanged, on
               </div>
             ))}
           </div>
-
-          {/* ACTION BOX: Role-based Workflow */}
-          {canAct && (
-            <div className="decision-box" style={{ background: '#f8fafc', padding: '16px', borderRadius: '6px', border: '1px solid #e2e8f0', marginTop: '16px' }}>
-              <label className="field-label">
-                {t.note}
-                <textarea
-                  rows="2"
-                  value={note}
-                  onChange={(event) => setNote(event.target.value)}
-                  placeholder={language === 'en' ? 'Add review findings, verification remarks, or instructions...' : 'සමාලෝචන සටහන් හෝ නිර්දේශ ඇතුළත් කරන්න...'}
-                />
-              </label>
-
-              {/* REVIEWER ACTIONS: Verify and forward to Authority */}
-              {(isReviewer || isAdmin) && isReviewerStage && (
-                <div style={{ marginTop: '12px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#1e293b', marginBottom: '4px' }}>
-                    {t.reviewerActions}
-                  </div>
-                  <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '8px' }}>
-                    {t.reviewerHint}
-                  </div>
-
-                  <div className="forward-action-grid">
-                    <button
-                      type="button"
-                      className="forward-btn"
-                      disabled={busy}
-                      onClick={() => decide('forward_official', 'authorized_official')}
-                    >
-                      <UserCheck size={16} />
-                      {t.forwardToOfficial}
-                      <small>{t.officialDesc}</small>
-                    </button>
-
-                    <button
-                      type="button"
-                      className="forward-btn"
-                      disabled={busy}
-                      onClick={() => decide('forward_minister', 'minister')}
-                    >
-                      <Landmark size={16} />
-                      {t.forwardToMinister}
-                      <small>{t.ministerDesc}</small>
-                    </button>
-
-                    <button
-                      type="button"
-                      className="forward-btn"
-                      disabled={busy}
-                      onClick={() => decide('forward_president', 'president')}
-                    >
-                      <Scale size={16} />
-                      {t.forwardToPresident}
-                      <small>{t.presidentDesc}</small>
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '14px' }}>
-                    <button
-                      className="secondary-button"
-                      disabled={busy}
-                      onClick={() => decide('return')}
-                    >
-                      <ArrowLeft size={14} />
-                      {t.return}
-                    </button>
-                    <button
-                      className="danger-button"
-                      disabled={busy}
-                      onClick={() => decide('reject')}
-                    >
-                      <X size={14} />
-                      {t.reject}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* HIGH AUTHORITY ACTIONS: Grant final approval or return/reject */}
-              {(isOfficial || isMinister || isPresident || (isAdmin && !isReviewerStage)) && (
-                <div style={{ marginTop: '12px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#1e293b', marginBottom: '4px' }}>
-                    {t.authorityClearance}
-                  </div>
-                  <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '8px' }}>
-                    {t.authorityHint}
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px' }}>
-                    <button
-                      className="secondary-button"
-                      disabled={busy}
-                      onClick={() => decide('return')}
-                    >
-                      <ArrowLeft size={14} />
-                      {t.return}
-                    </button>
-                    <button
-                      className="danger-button"
-                      disabled={busy}
-                      onClick={() => decide('reject')}
-                    >
-                      <X size={14} />
-                      {t.reject}
-                    </button>
-                    <button
-                      className="primary-button"
-                      disabled={busy}
-                      onClick={() => decide('approve')}
-                    >
-                      <Check size={15} />
-                      {language === 'en' ? 'Grant Final Approval' : 'අවසාන අනුමැතිය ලබාදෙන්න'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {error && <div className="form-error" style={{ marginTop: '12px' }}>{error}</div>}
         </div>
       </section>
     </div>
