@@ -40,9 +40,13 @@ import {
   Users,
   FolderArchive,
   Lock,
+  User,
+  Eye,
+  EyeOff,
   X
 } from 'lucide-react';
 import SignaturePad from './signature-pad.jsx';
+import ProfileSection from './profile-section.jsx';
 import DetailedRequestModal, {
   RequestDetails,
   DepartmentHeadEndorsementSection,
@@ -165,6 +169,7 @@ const copy = {
     adminNotice: 'Administrative access',
     noteLabel: 'Search by applicant, destination or ref',
     profile: 'Your workspace',
+    myProfile: 'My Profile',
     today: 'THURSDAY, 15 OCTOBER 2026',
     years: 'All years',
     filter: 'Filters',
@@ -311,6 +316,7 @@ const copy = {
     adminNotice: 'පරිපාලන පිවිසුම',
     noteLabel: 'අයදුම්කරු, ගමනාන්තය හෝ අංකය අනුව සොයන්න',
     profile: 'ඔබගේ වැඩපොළ',
+    myProfile: 'මගේ පැතිකඩ',
     today: '2026 ඔක්තෝබර් 15, බ්‍රහස්පතින්දා',
     years: 'සියලු වසර',
     filter: 'පෙරහන්',
@@ -405,6 +411,7 @@ function App() {
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserRole, setNewUserRole] = useState('applicant');
   const [newUserPassword, setNewUserPassword] = useState('Demo@123');
+  const [showNewUserPassword, setShowNewUserPassword] = useState(false);
   const [userFormBusy, setUserFormBusy] = useState(false);
   const [userFormError, setUserFormError] = useState('');
   const [userSearch, setUserSearch] = useState('');
@@ -418,6 +425,15 @@ function App() {
   const prevNotifCountRef = useRef(0);
 
   const t = copy[language];
+
+  function handleProfileUpdated(updatedUser, newToken) {
+    setUser(updatedUser);
+    localStorage.setItem('portal-user', JSON.stringify(updatedUser));
+    if (newToken) {
+      setToken(newToken);
+      localStorage.setItem('portal-token', newToken);
+    }
+  }
 
   async function loadRequests() {
     if (!token) return;
@@ -1418,6 +1434,15 @@ function App() {
             <span className="nav-icon"><BarChart3 size={17} /></span>
             {t.reports}
           </button>
+
+          {/* 5. USER PROFILE */}
+          <button
+            className={activeNav === 'profile' ? 'nav-item active' : 'nav-item'}
+            onClick={() => setActiveNav('profile')}
+          >
+            <span className="nav-icon"><User size={17} /></span>
+            {t.myProfile || 'My Profile'}
+          </button>
         </nav>
 
         <div className="side-bottom">
@@ -1426,7 +1451,11 @@ function App() {
             <span>Sri Lanka Gov · v2.5</span>
             <ArrowRight size={14} />
           </div>
-          <div className="profile-block">
+          <div
+            className={`profile-block ${activeNav === 'profile' ? 'active-profile' : ''}`}
+            onClick={() => setActiveNav('profile')}
+            title={language === 'en' ? 'Click to view / edit profile' : 'පැතිකඩ බැලීමට / සංස්කරණය කිරීමට ක්ලික් කරන්න'}
+          >
             <div className="avatar">
               {user.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}
             </div>
@@ -1434,7 +1463,14 @@ function App() {
               <strong>{user.name}</strong>
               <span>{t.roleNames[user.role] || user.role}</span>
             </div>
-            <button title={t.signOut} aria-label={t.signOut} onClick={signOut}>
+            <button
+              title={t.signOut}
+              aria-label={t.signOut}
+              onClick={(e) => {
+                e.stopPropagation();
+                signOut();
+              }}
+            >
               <LogOut size={16} />
             </button>
           </div>
@@ -1453,6 +1489,7 @@ function App() {
               {activeNav === 'users' && (language === 'en' ? 'USER MANAGEMENT & ADD USER' : 'පරිශීලක කළමනාකරණය')}
               {activeNav === 'reports' && (language === 'en' ? 'ALL REPORTS' : 'සියලු වාර්තා')}
               {activeNav === 'requests' && t.requests.toUpperCase()}
+              {activeNav === 'profile' && (language === 'en' ? 'MY PROFILE & SECURITY' : 'මගේ පැතිකඩ සහ ආරක්ෂාව')}
             </strong>
           </div>
           <div className="top-actions">
@@ -1532,7 +1569,11 @@ function App() {
               )}
             </div>
 
-            <div className="top-avatar">
+            <div
+              className="top-avatar"
+              onClick={() => setActiveNav('profile')}
+              title={language === 'en' ? 'My Profile' : 'මගේ පැතිකඩ'}
+            >
               {user.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}
             </div>
           </div>
@@ -1659,7 +1700,7 @@ function App() {
                     </button>
                   )}
                 </div>
-                <div className="pipeline-flow" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+                <div className="pipeline-flow" style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))' }}>
                   <div
                     className={`pipeline-stage ${deptHeadPending > 0 ? 'has-pending' : ''}`}
                     onClick={() => { setApprovalStageFilter('Pending Department Head Approval'); setActiveNav('approvals'); }}
@@ -1741,7 +1782,7 @@ function App() {
                     <h2>{language === 'en' ? 'Recent Applications Overview' : 'මෑත ඉල්ලීම් සාරාංශය'}</h2>
                     <p>{t.track}</p>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <label className="search-box">
                       <Search size={15} />
                       <input
@@ -1749,6 +1790,16 @@ function App() {
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder={t.noteLabel}
                       />
+                      {query && (
+                        <button
+                          type="button"
+                          className="search-clear-btn"
+                          onClick={() => setQuery('')}
+                          title={language === 'si' ? 'සොයන පදය ඉවත් කරන්න' : 'Clear search'}
+                        >
+                          <X size={13} />
+                        </button>
+                      )}
                     </label>
                   </div>
                 </div>
@@ -1913,10 +1964,6 @@ function App() {
                   <span>
                     Showing <strong>{overviewList.length ? 1 : 0}-{Math.min(8, overviewList.length)}</strong> of <strong>{overviewList.length}</strong> applications
                   </span>
-                  <button className="secondary-button" style={{ height: '28px', padding: '0 10px', fontSize: '10px' }} onClick={() => setActiveNav('reports')}>
-                    {language === 'en' ? 'View Complete Audit Report' : 'සම්පූර්ණ වාර්තාව බලන්න'}
-                    <ArrowRight size={12} />
-                  </button>
                 </footer>
               </section>
             </div>
@@ -1971,7 +2018,7 @@ function App() {
                     <h2>{language === 'en' ? 'Applications Queue' : 'ඉල්ලීම් පෝලිම'}</h2>
                     <p>{language === 'en' ? 'Filter by review stage or authority' : 'අදියර හෝ බලධාරියා අනුව පෙරහන් කරන්න'}</p>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <label className="search-box">
                       <Search size={15} />
                       <input
@@ -1979,6 +2026,16 @@ function App() {
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder={t.noteLabel}
                       />
+                      {query && (
+                        <button
+                          type="button"
+                          className="search-clear-btn"
+                          onClick={() => setQuery('')}
+                          title={language === 'si' ? 'සොයන පදය ඉවත් කරන්න' : 'Clear search'}
+                        >
+                          <X size={13} />
+                        </button>
+                      )}
                     </label>
                   </div>
                 </div>
@@ -2363,13 +2420,24 @@ function App() {
 
                     <label className="field-label">
                       {t.temporaryPassword} *
-                      <input
-                        type="password"
-                        required
-                        value={newUserPassword}
-                        onChange={(e) => setNewUserPassword(e.target.value)}
-                        placeholder="Password"
-                      />
+                      <div className="password-input-wrap">
+                        <input
+                          type={showNewUserPassword ? 'text' : 'password'}
+                          required
+                          value={newUserPassword}
+                          onChange={(e) => setNewUserPassword(e.target.value)}
+                          placeholder="Password"
+                        />
+                        <button
+                          type="button"
+                          className="password-toggle-btn"
+                          onClick={() => setShowNewUserPassword(!showNewUserPassword)}
+                          title={showNewUserPassword ? (language === 'si' ? 'මුරපදය සඟවන්න' : 'Hide password') : (language === 'si' ? 'මුරපදය පෙන්වන්න' : 'Show password')}
+                          aria-label="Toggle password visibility"
+                        >
+                          {showNewUserPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </div>
                     </label>
 
                     {userFormError && <div className="form-error">{userFormError}</div>}
@@ -2402,13 +2470,23 @@ function App() {
                         {language === 'en' ? 'Active accounts and security role assignments' : 'ක්‍රියාකාරී ගිණුම් සහ භූමිකාවන්'}
                       </p>
                     </div>
-                    <label className="search-box" style={{ width: '220px' }}>
+                    <label className="search-box" style={{ width: '280px' }}>
                       <Search size={14} />
                       <input
                         value={userSearch}
                         onChange={(e) => setUserSearch(e.target.value)}
                         placeholder={language === 'en' ? 'Search officer...' : 'සොයන්න...'}
                       />
+                      {userSearch && (
+                        <button
+                          type="button"
+                          className="search-clear-btn"
+                          onClick={() => setUserSearch('')}
+                          title={language === 'si' ? 'සොයන පදය ඉවත් කරන්න' : 'Clear search'}
+                        >
+                          <X size={13} />
+                        </button>
+                      )}
                     </label>
                   </div>
 
@@ -2559,7 +2637,7 @@ function App() {
                     <h2>{language === 'en' ? 'Foreign Visits & Official Leave Master Report' : 'විදේශ සංචාර සහ නිල නිවාඩු ප්‍රධාන වාර්තාව'}</h2>
                     <p>{language === 'en' ? 'Includes Appendix 16 clearance and General 126 leave records' : 'උපග්‍රන්ථ 16 සහ සාමාන්‍ය 126 නිවාඩු වාර්තා ඇතුළත් වේ'}</p>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <label className="search-box">
                       <Search size={15} />
                       <input
@@ -2567,6 +2645,16 @@ function App() {
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder={t.noteLabel}
                       />
+                      {query && (
+                        <button
+                          type="button"
+                          className="search-clear-btn"
+                          onClick={() => setQuery('')}
+                          title={language === 'si' ? 'සොයන පදය ඉවත් කරන්න' : 'Clear search'}
+                        >
+                          <X size={13} />
+                        </button>
+                      )}
                     </label>
                   </div>
                 </div>
@@ -2713,6 +2801,19 @@ function App() {
                 </footer>
               </section>
             </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* VIEW 5: USER PROFILE */}
+          {/* ========================================================= */}
+          {activeNav === 'profile' && (
+            <ProfileSection
+              user={user}
+              onProfileUpdated={handleProfileUpdated}
+              token={token}
+              language={language}
+              showToast={(msg) => setToast(msg)}
+            />
           )}
 
           <footer className="page-footer">
@@ -2895,12 +2996,15 @@ function AuthPage({ language, setLanguage, t, onLogin }) {
   // Sign In state
   const [email, setEmail] = useState('officer@foring.gov.lk');
   const [password, setPassword] = useState('Demo@123');
+  const [showSignInPassword, setShowSignInPassword] = useState(false);
 
   // Registration state (Applicant only)
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
 
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -3028,14 +3132,25 @@ function AuthPage({ language, setLanguage, t, onLogin }) {
                 </label>
                 <label className="field-label">
                   {t.password}
-                  <input
-                    type="password"
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    placeholder="Enter your password"
-                    required
-                  />
+                  <div className="password-input-wrap">
+                    <input
+                      type={showSignInPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      placeholder="Enter your password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle-btn"
+                      onClick={() => setShowSignInPassword(!showSignInPassword)}
+                      title={showSignInPassword ? (language === 'si' ? 'මුරපදය සඟවන්න' : 'Hide password') : (language === 'si' ? 'මුරපදය පෙන්වන්න' : 'Show password')}
+                      aria-label="Toggle password visibility"
+                    >
+                      {showSignInPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
                 </label>
 
                 {error && <div className="form-error">{error}</div>}
@@ -3121,24 +3236,46 @@ function AuthPage({ language, setLanguage, t, onLogin }) {
 
                 <label className="field-label">
                   {t.password} *
-                  <input
-                    type="password"
-                    required
-                    value={regPassword}
-                    onChange={(e) => setRegPassword(e.target.value)}
-                    placeholder="Create a strong password"
-                  />
+                  <div className="password-input-wrap">
+                    <input
+                      type={showRegPassword ? 'text' : 'password'}
+                      required
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      placeholder="Create a strong password"
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle-btn"
+                      onClick={() => setShowRegPassword(!showRegPassword)}
+                      title={showRegPassword ? (language === 'si' ? 'මුරපදය සඟවන්න' : 'Hide password') : (language === 'si' ? 'මුරපදය පෙන්වන්න' : 'Show password')}
+                      aria-label="Toggle password visibility"
+                    >
+                      {showRegPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
                 </label>
 
                 <label className="field-label">
                   {t.confirmPassword} *
-                  <input
-                    type="password"
-                    required
-                    value={regConfirmPassword}
-                    onChange={(e) => setRegConfirmPassword(e.target.value)}
-                    placeholder="Confirm password"
-                  />
+                  <div className="password-input-wrap">
+                    <input
+                      type={showRegConfirmPassword ? 'text' : 'password'}
+                      required
+                      value={regConfirmPassword}
+                      onChange={(e) => setRegConfirmPassword(e.target.value)}
+                      placeholder="Confirm password"
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle-btn"
+                      onClick={() => setShowRegConfirmPassword(!showRegConfirmPassword)}
+                      title={showRegConfirmPassword ? (language === 'si' ? 'මුරපදය සඟවන්න' : 'Hide password') : (language === 'si' ? 'මුරපදය පෙන්වන්න' : 'Show password')}
+                      aria-label="Toggle password visibility"
+                    >
+                      {showRegConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
                 </label>
 
                 {error && <div className="form-error">{error}</div>}

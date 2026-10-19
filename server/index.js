@@ -92,6 +92,12 @@ if (!userColumns.includes('department_name')) {
 if (!userColumns.includes('designation')) {
   db.exec('ALTER TABLE users ADD COLUMN designation TEXT');
 }
+if (!userColumns.includes('phone')) {
+  db.exec('ALTER TABLE users ADD COLUMN phone TEXT');
+}
+if (!userColumns.includes('signature')) {
+  db.exec('ALTER TABLE users ADD COLUMN signature TEXT');
+}
 
 const MINISTERIAL_RANKS = {
   reviewer: 0,
@@ -304,8 +310,64 @@ app.post('/api/auth/login', (req, res) => {
     department_id: user.department_id || null,
     department_name: user.department_name || null,
     designation: user.designation || null,
+    phone: user.phone || null,
+    signature: user.signature || null,
   };
   res.json({ token: jwt.sign(profile, secret, { expiresIn: '8h' }), user: profile });
+});
+
+// =========================================================================
+// USER PROFILE MANAGEMENT (VIEW & UPDATE)
+// =========================================================================
+app.get('/api/profile', authenticate, (req, res) => {
+  const user = db.prepare('SELECT id, name, email, role, department_id, department_name, designation, phone, signature FROM users WHERE id = ?').get(req.user.id);
+  if (!user) return res.status(404).json({ error: 'User profile not found.' });
+  res.json(user);
+});
+
+app.put('/api/profile', authenticate, (req, res) => {
+  const { name, email, designation, department_name, phone, signature, currentPassword, newPassword } = req.body || {};
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'Name cannot be empty.' });
+  }
+  const cleanEmail = email ? email.trim().toLowerCase() : req.user.email;
+  const existing = db.prepare('SELECT id FROM users WHERE lower(email) = ? AND id != ?').get(cleanEmail, req.user.id);
+  if (existing) {
+    return res.status(400).json({ error: 'A user with this email address already exists.' });
+  }
+
+  let passwordHash = null;
+  if (newPassword && newPassword.trim()) {
+    if (!currentPassword) {
+      return res.status(400).json({ error: 'Please enter your current password to change password.' });
+    }
+    const currentRecord = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(req.user.id);
+    if (!currentRecord || !bcrypt.compareSync(currentPassword, currentRecord.password_hash)) {
+      return res.status(400).json({ error: 'Current password does not match.' });
+    }
+    if (newPassword.trim().length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters long.' });
+    }
+    passwordHash = bcrypt.hashSync(newPassword.trim(), 10);
+  }
+
+  if (passwordHash) {
+    db.prepare(`
+      UPDATE users 
+      SET name = ?, email = ?, designation = ?, department_name = ?, phone = ?, signature = ?, password_hash = ?
+      WHERE id = ?
+    `).run(name.trim(), cleanEmail, designation?.trim() || null, department_name?.trim() || null, phone?.trim() || null, signature || null, passwordHash, req.user.id);
+  } else {
+    db.prepare(`
+      UPDATE users 
+      SET name = ?, email = ?, designation = ?, department_name = ?, phone = ?, signature = ?
+      WHERE id = ?
+    `).run(name.trim(), cleanEmail, designation?.trim() || null, department_name?.trim() || null, phone?.trim() || null, signature || null, req.user.id);
+  }
+
+  const updated = db.prepare('SELECT id, name, email, role, department_id, department_name, designation, phone, signature FROM users WHERE id = ?').get(req.user.id);
+  const token = jwt.sign(updated, secret, { expiresIn: '8h' });
+  res.json({ success: true, user: updated, token });
 });
 
 app.get('/api/requests', authenticate, (req, res) => {

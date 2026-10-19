@@ -17,6 +17,28 @@ body,
   background: #fff;
   color: #26364d;
   border-right: 1px solid #e4eaf2;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  max-height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex-shrink: 0;
+  z-index: 100;
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 4px;
 }
 
 .crest-lockup {
@@ -97,6 +119,9 @@ body,
 .topbar {
   background: #fff;
   border-color: #e4eaf2;
+  position: sticky;
+  top: 0;
+  z-index: 90;
 }
 
 .crumb,
@@ -545,16 +570,17 @@ body,
 }
 .pipeline-flow {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
 }
 .pipeline-stage {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 6px;
-  padding: 12px;
+  padding: 11px 12px;
   transition: all 0.2s;
   cursor: pointer;
+  min-width: 0;
 }
 .pipeline-stage:hover {
   background: #f1f5f9;
@@ -580,6 +606,7 @@ body,
   background: #e2e8f0;
   display: grid;
   place-items: center;
+  flex-shrink: 0;
 }
 .pipeline-stage.has-pending .stage-num {
   background: #155eef;
@@ -598,12 +625,18 @@ body,
   font-weight: 600;
   color: #334155;
   display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .stage-desc {
   font-size: 9px;
   color: #64748b;
   display: block;
   margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* User Management styles */
@@ -2503,4 +2536,153 @@ tr.row-unviewed:hover {
   font-size: 10px;
   color: #166534;
   display: block;
+}
+
+/* Sidebar Profile Block Active & Hover Styling */
+.profile-block {
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 8px 10px !important;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.profile-block:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.profile-block.active-profile {
+  background: rgba(21, 94, 239, 0.22) !important;
+  outline: 1px solid rgba(21, 94, 239, 0.45);
+}
+
+.top-avatar {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.top-avatar:hover {
+  transform: scale(1.08);
+  box-shadow: 0 0 0 2px #155eef;
+}
+
+/* Password Field with Hide / Show Button */
+.password-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.password-input-wrap input {
+  width: 100%;
+  padding-right: 36px !important;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s ease, background 0.15s ease;
+  z-index: 2;
+}
+
+.password-toggle-btn:hover {
+  color: #0f172a;
+  background: #f1f5f9;
+}
+
+/* Modern Responsive Search Box Styling */
+.table-heading {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+  flex-wrap: wrap !important;
+  padding: 16px 20px !important;
+}
+
+.table-heading > div:first-child {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.table-heading > div:last-child {
+  flex-shrink: 0;
+}
+
+.search-box {
+  height: 38px !important;
+  width: 320px !important;
+  min-width: 260px !important;
+  max-width: 100% !important;
+  border: 1.5px solid #cbd5e1 !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 0 12px !important;
+  color: #64748b !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
+}
+
+.search-box:hover {
+  border-color: #94a3b8 !important;
+}
+
+.search-box:focus-within {
+  border-color: #155eef !important;
+  box-shadow: 0 0 0 3px rgba(21, 94, 239, 0.15) !important;
+  color: #155eef !important;
+}
+
+.search-box input {
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  color: #0f172a !important;
+  font-size: 12.5px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  height: 100% !important;
+}
+
+.search-box input::placeholder {
+  color: #94a3b8 !important;
+}
+
+.search-clear-btn {
+  background: none;
+  border: none;
+  padding: 3px;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.search-clear-btn:hover {
+  color: #0f172a;
+  background: #f1f5f9;
 }
