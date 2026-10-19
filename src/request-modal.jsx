@@ -30,7 +30,8 @@ import {
   ChevronRight,
   FileDown,
   Printer,
-  FolderArchive
+  FolderArchive,
+  Lock
 } from 'lucide-react';
 import SignaturePad from './signature-pad.jsx';
 
@@ -2625,6 +2626,17 @@ export function ApplicantLiveProcessTracker({
   const info = getHierarchyStatusInfo(activeReq, language);
   const d = activeReq.details || (activeReq.applicant_name ? activeReq : {});
   const isOfficial = activeReq.leave_type === 'Official duty' || d.leaveType === 'Official duty' || d.leaveCategory === 'Official duty';
+  const clearances = Array.isArray(d.secretariatClearances) ? d.secretariatClearances : [];
+  const hasDeptHeadPart = Boolean(d.departmentHeadEndorsement && (d.departmentHeadEndorsement.signature || d.departmentHeadEndorsement.myNo));
+  const hasOfficeUsePart = Boolean(d.officerCompleted || d.officerAssessment?.total || d.officerSignature);
+  const hasSecretaryPart = Boolean(
+    d.secretaryApproval?.signature ||
+    d.secretaryApproval?.signatoryName ||
+    d.secretaryApproval?.letterNumber ||
+    d.secretaryApproval?.signedAt ||
+    clearances.some(c => (c.role === 'secretary' || c.role === 'authorized_official') && (c.signature || c.decision)) ||
+    (activeReq.status === 'Approved' || activeReq.status === 'Pending Presidential Approval')
+  );
 
   return (
     <div style={{
@@ -2995,7 +3007,7 @@ export function ApplicantLiveProcessTracker({
           <span>{language === 'si' ? 'General 126 PDF' : 'General 126 PDF'}</span>
         </button>
 
-        {d.departmentHeadEndorsement && (
+        {hasDeptHeadPart && (
           <button
             type="button"
             className="secondary-button"
@@ -3007,7 +3019,7 @@ export function ApplicantLiveProcessTracker({
           </button>
         )}
 
-        {(d.officerCompleted || d.officerAssessment) && (
+        {hasOfficeUsePart && (
           <button
             type="button"
             className="secondary-button"
@@ -3019,7 +3031,7 @@ export function ApplicantLiveProcessTracker({
           </button>
         )}
 
-        {(d.secretaryApproval || activeReq.status === 'Approved') && (
+        {hasSecretaryPart && (
           <button
             type="button"
             className="secondary-button"
@@ -3965,13 +3977,18 @@ export function RequestDetails({ details = {}, language, request, onPrintOfficer
 // =========================================================================
 export function printOfficeUseOnlyPdf(r) {
   if (!r) return;
+  const d = r.details || (r.officerCompleted ? r : {});
+  const isCompleted = Boolean(d.officerCompleted || d.officerAssessment?.total || d.officerSignature);
+  if (!isCompleted) {
+    alert('විෂයභාර නිලධාරී (Subject Officer) විසින් කාර්යාලීය නිවාඩු විස්තර තවමත් සම්පූර්ණ කර නොමැති බැවින් මෙම කොටස බැලීමට හෝ බාගත කිරීමට නොහැක.\n\nThis section has not been completed by the Subject Officer yet and cannot be viewed or downloaded.');
+    return;
+  }
   const printWin = window.open('', '_blank');
   if (!printWin) {
     alert('Please allow popups in your browser to download/print the PDF.');
     return;
   }
 
-  const d = r.details || (r.officerCompleted ? r : {});
   const clearances = Array.isArray(d.secretariatClearances) ? d.secretariatClearances : [];
   const subjectOfficerClearance = clearances.find(c => c.role === 'reviewer') || (d.officerCompleted ? {
     userName: d.officerCompletedBy?.name || 'Senior Reviewing Officer',
@@ -4828,13 +4845,19 @@ if (typeof window !== 'undefined') {
 // =========================================================================
 export function printNoteSheetMinisterialPdf(r) {
   if (!r) return;
+  const d = r.details || (r.applicant_name ? r : {});
+  const clearances = Array.isArray(d.secretariatClearances) ? d.secretariatClearances : [];
+  const isCompleted = clearances.length > 0 && clearances.some(c => c.signature || c.decision);
+  if (!isCompleted) {
+    alert('අමාත්‍යාංශ ලේකම් කාර්යාලය (Ministry Secretariat) විසින් අවසර පත්‍රිකාව (Clearance Sheet) තවමත් සටහන් කර නොමැති බැවින් බැලීමට හෝ බාගත කිරීමට නොහැක.\n\nThis Clearance Sheet has not been completed yet and cannot be viewed or downloaded.');
+    return;
+  }
   const printWin = window.open('', '_blank');
   if (!printWin) {
     alert('Please allow popups in your browser to download/print the PDF.');
     return;
   }
 
-  const d = r.details || (r.applicant_name ? r : {});
   const refNo = r.id ? `FV-${String(r.id).padStart(4, '0')}` : 'FV-REF';
   const applicantName = r.applicant_name || d.applicantName || d.fullName || '—';
   const designation = d.designation || r.designation || '—';
@@ -4855,9 +4878,6 @@ export function printNoteSheetMinisterialPdf(r) {
   const periodText = (startDate !== '—' && endDate !== '—')
     ? `${startDate} - ${endDate}${daysApplied !== '—' ? ` (${daysApplied} Days / දින)` : ''}`
     : (d.dates || '—');
-
-  // Hierarchy clearances
-  const clearances = Array.isArray(d.secretariatClearances) ? d.secretariatClearances : [];
 
   // 1. Assistant Secretary
   const asClearance = clearances.find(c => c.role === 'assistant_secretary');
@@ -5568,14 +5588,19 @@ if (typeof window !== 'undefined') {
 // =========================================================================
 export function printDepartmentHeadLetterPdf(r) {
   if (!r) return;
+  const d = r.details || (r.applicant_name ? r : {});
+  const endorsement = d.departmentHeadEndorsement || {};
+  const isCompleted = Boolean(endorsement && (endorsement.signature || endorsement.myNo));
+  if (!isCompleted) {
+    alert('දෙපාර්තමේන්තු / ආයතන ප්‍රධානියා (Head of Department) විසින් මෙම ලිපිය තවමත් සම්පූර්ණ කර නොමැති බැවින් බැලීමට හෝ බාගත කිරීමට නොහැක.\n\nThis letter has not been completed and signed by the Head of Department yet and cannot be viewed or downloaded.');
+    return;
+  }
   const printWin = window.open('', '_blank');
   if (!printWin) {
     alert('Please allow popups in your browser to download/print the PDF.');
     return;
   }
 
-  const d = r.details || (r.applicant_name ? r : {});
-  const endorsement = d.departmentHeadEndorsement || {};
   const departmentName = r.department_name || d.department || endorsement.completedBy?.department || 'Sri Lanka Telecom and its Subsidiaries and Allied Institutions';
 
   const rawMinistry = endorsement.ministryName || d.ministry || 'Technology';
@@ -5613,6 +5638,14 @@ export function printDepartmentHeadLetterPdf(r) {
   const secDate = secretaryClearance?.date || secretaryClearance?.timestamp?.slice(0, 10) || (r.status === 'Approved' ? r.updated_at?.slice(0, 10) : '...........................');
   const isSecretaryApproved = r.status === 'Approved' || r.status === 'Pending Presidential Approval' || secretaryClearance?.decision === 'approve';
   const isSecretaryRejected = r.status === 'Rejected' || secretaryClearance?.decision === 'reject';
+  const hasSecretaryCompleted = Boolean(
+    d.secretaryApproval?.signature ||
+    d.secretaryApproval?.signatoryName ||
+    d.secretaryApproval?.letterNumber ||
+    d.secretaryApproval?.signedAt ||
+    clearances.some(c => (c.role === 'secretary' || c.role === 'authorized_official') && (c.signature || c.decision)) ||
+    (r.status === 'Approved' || r.status === 'Pending Presidential Approval')
+  );
 
   printWin.document.write(`
     <!DOCTYPE html>
@@ -5860,15 +5893,22 @@ export function printDepartmentHeadLetterPdf(r) {
             <span style="opacity: 0.8; margin-left: 10px;">Ref: ${refNo} · ${rawApplicantName}</span>
           </div>
           <div style="display: flex; gap: 8px;">
-            <button class="toolbar-btn btn-primary" onclick="printAll()">
-              🖨️ සියල්ල මුද්‍රණය (Print Both)
-            </button>
-            <button class="toolbar-btn btn-secondary" onclick="printPart1Only()">
-              📄 1. ආයතන ප්‍රධානී ලිපිය (Part 1 Only)
-            </button>
-            <button class="toolbar-btn btn-secondary" onclick="printPart2Only()">
-              📄 2. ලේකම් ලිපිය (Part 2 Only)
-            </button>
+            ${hasSecretaryCompleted ? `
+              <button class="toolbar-btn btn-primary" onclick="printAll()">
+                🖨️ සියල්ල මුද්‍රණය (Print Both)
+              </button>
+              <button class="toolbar-btn btn-secondary" onclick="printPart1Only()">
+                📄 1. ආයතන ප්‍රධානී ලිපිය (Part 1 Only)
+              </button>
+              <button class="toolbar-btn btn-secondary" onclick="printPart2Only()">
+                📄 2. ලේකම් ලිපිය (Part 2 Only)
+              </button>
+            ` : `
+              <button class="toolbar-btn btn-primary" onclick="window.print()">
+                🖨️ මුද්‍රණය කරන්න (Print Letter)
+              </button>
+              <span style="font-size: 11px; opacity: 0.8; align-self: center;">(🔒 ලේකම් අනුමැතිය සම්පූර්ණ වන තෙක් Part II අගුළුලා ඇත)</span>
+            `}
             <button class="toolbar-btn btn-secondary" onclick="window.close()">
               ✕ වසන්න
             </button>
@@ -5955,11 +5995,12 @@ export function printDepartmentHeadLetterPdf(r) {
 
           <div class="doc-footer-meta">
             <span>Establishments Code Chapter XV · Section 10:1 (Part I: Head of Department)</span>
-            <span>Ref: ${refNo} · Page 1 of 2</span>
+            <span>Ref: ${refNo} · Page 1 of ${hasSecretaryCompleted ? '2' : '1'}</span>
           </div>
         </div>
 
         <!-- PAGE 2: MINISTRY SECRETARY APPROVAL & DIRECTIVE -->
+        ${hasSecretaryCompleted ? `
         <div class="sheet-page" id="page-part2">
           <div class="sheet-content">
             <div class="official-letterhead">
@@ -6016,6 +6057,7 @@ export function printDepartmentHeadLetterPdf(r) {
             <span>Ref: ${secRefNo} · Page 2 of 2</span>
           </div>
         </div>
+        ` : ''}
 
         <script>
           function printAll() {
@@ -6023,13 +6065,17 @@ export function printDepartmentHeadLetterPdf(r) {
             window.print();
           }
           function printPart1Only() {
-            document.getElementById('page-part1').classList.remove('hide-on-print');
-            document.getElementById('page-part2').classList.add('hide-on-print');
+            var p1 = document.getElementById('page-part1');
+            var p2 = document.getElementById('page-part2');
+            if (p1) p1.classList.remove('hide-on-print');
+            if (p2) p2.classList.add('hide-on-print');
             window.print();
           }
           function printPart2Only() {
-            document.getElementById('page-part1').classList.add('hide-on-print');
-            document.getElementById('page-part2').classList.remove('hide-on-print');
+            var p1 = document.getElementById('page-part1');
+            var p2 = document.getElementById('page-part2');
+            if (p1) p1.classList.add('hide-on-print');
+            if (p2) p2.classList.remove('hide-on-print');
             window.print();
           }
           window.onload = function() {
@@ -6049,19 +6095,31 @@ export const printHeadOfDepartmentLetterPdf = printDepartmentHeadLetterPdf;
 // =========================================================================
 export function printSecretaryApprovalLetterPdf(r) {
   if (!r) return;
+  const d = r.details || (r.applicant_name ? r : {});
+  const clearances = Array.isArray(d.secretariatClearances) ? d.secretariatClearances : [];
+  const isCompleted = Boolean(
+    d.secretaryApproval?.signature ||
+    d.secretaryApproval?.signatoryName ||
+    d.secretaryApproval?.letterNumber ||
+    d.secretaryApproval?.signedAt ||
+    clearances.some(c => (c.role === 'secretary' || c.role === 'authorized_official') && (c.signature || c.decision)) ||
+    (r.status === 'Approved' || r.status === 'Pending Presidential Approval')
+  );
+  if (!isCompleted) {
+    alert('අමාත්‍යාංශ ලේකම්වරයා (Ministry Secretary) විසින් මෙම නිවාඩු අනුමත ලිපිය තවමත් සම්පූර්ණ කර අත්සන් කර නොමැති බැවින් බැලීමට හෝ බාගත කිරීමට නොහැක.\n\nThis letter has not been completed and signed by the Ministry Secretary yet and cannot be viewed or downloaded.');
+    return;
+  }
   const printWin = window.open('', '_blank');
   if (!printWin) {
     alert('Please allow popups in your browser to download/print the PDF.');
     return;
   }
 
-  const d = r.details || (r.applicant_name ? r : {});
   const endorsement = d.departmentHeadEndorsement || {};
   const departmentName = r.department_name || d.department || endorsement.completedBy?.department || 'Sri Lanka Telecom and its Subsidiaries and Allied Institutions';
   const rawMinistry = endorsement.ministryName || d.ministry || 'Technology';
   const cleanMinistryName = rawMinistry.replace(/^(ministry\s+of\s+|අමාත්‍යාංශය\s*)/i, '').trim() || rawMinistry;
 
-  const clearances = Array.isArray(d.secretariatClearances) ? d.secretariatClearances : [];
   const secretaryClearance = clearances.find(c => c.role === 'secretary' || c.decision === 'approve') || d.secretaryApproval || (r.status === 'Approved' ? {
     userName: 'වරුෂණ ශ්‍රී ධනපාල (Varushana Sri Dhanapala)',
     userDesignation: 'ලේකම් (Secretary)',
@@ -7141,50 +7199,54 @@ export function DepartmentHeadEndorsementSection({ request, user, language = 'en
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => printDepartmentHeadLetterPdf(request)}
-            title={language === 'si' ? 'දෙපාර්තමේන්තු ප්‍රධානියා පුරවනු ලබන ලිපිය PDF ලෙස බාගන්න' : 'Download Head of Department Forwarding Letter as PDF'}
-            style={{
-              fontSize: '11px',
-              height: '30px',
-              padding: '0 10px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
-              borderColor: '#8b5cf6',
-              background: '#f5f3ff',
-              color: '#6d28d9',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
-          >
-            <FileDown size={13} />
-            <span>{language === 'si' ? '📄 ආයතන ප්‍රධානී ලිපිය' : '📄 Dept Head Letter'}</span>
-          </button>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => printSecretaryApprovalLetterPdf(request)}
-            title={language === 'si' ? 'අමාත්‍යාංශ ලේකම්ගේ නිවාඩු අනුමත ලිපිය PDF ලෙස බාගන්න' : 'Download Ministry Secretary Approval Letter as PDF'}
-            style={{
-              fontSize: '11px',
-              height: '30px',
-              padding: '0 10px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
-              borderColor: '#86efac',
-              background: '#f0fdf4',
-              color: '#15803d',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
-          >
-            <FileDown size={13} />
-            <span>{language === 'si' ? '📄 ලේකම් ලිපිය' : '📄 Secretary Letter'}</span>
-          </button>
+          {isAlreadyCompleted && (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => printDepartmentHeadLetterPdf(request)}
+              title={language === 'si' ? 'දෙපාර්තමේන්තු ප්‍රධානියා පුරවනු ලබන ලිපිය PDF ලෙස බාගන්න' : 'Download Head of Department Forwarding Letter as PDF'}
+              style={{
+                fontSize: '11px',
+                height: '30px',
+                padding: '0 10px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                borderColor: '#8b5cf6',
+                background: '#f5f3ff',
+                color: '#6d28d9',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              <FileDown size={13} />
+              <span>{language === 'si' ? '📄 ආයතන ප්‍රධානී ලිපිය' : '📄 Dept Head Letter'}</span>
+            </button>
+          )}
+          {isSecretaryDecided && (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => printSecretaryApprovalLetterPdf(request)}
+              title={language === 'si' ? 'අමාත්‍යාංශ ලේකම්ගේ නිවාඩු අනුමත ලිපිය PDF ලෙස බාගන්න' : 'Download Ministry Secretary Approval Letter as PDF'}
+              style={{
+                fontSize: '11px',
+                height: '30px',
+                padding: '0 10px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                borderColor: '#86efac',
+                background: '#f0fdf4',
+                color: '#15803d',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              <FileDown size={13} />
+              <span>{language === 'si' ? '📄 ලේකම් ලිපිය' : '📄 Secretary Letter'}</span>
+            </button>
+          )}
           {isAlreadyCompleted && !isEditing && isDeptHeadOrAdmin && isDeptHeadStage && (
             <button
               type="button"
@@ -7321,65 +7383,86 @@ export function DepartmentHeadEndorsementSection({ request, user, language = 'en
             </div>
           </div>
 
-          {/* Official Part 2: Ministry Secretary Leave Approval / Directive (Est. Code XV 10:1 - Image 2) */}
-          <div style={{
-            marginTop: '22px',
-            background: isSecretaryDecided ? (isSecretaryApproved ? '#f0fdf4' : '#fef2f2') : '#f8fafc',
-            border: `1.5px dashed ${isSecretaryDecided ? (isSecretaryApproved ? '#86efac' : '#fca5a5') : '#cbd5e1'}`,
-            borderRadius: '8px',
-            padding: '16px'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 800, color: '#334155' }}>
-                {language === 'si' ? 'අමාත්‍යාංශ ලේකම්ගේ තීරණය හා නියෝගය (Ministry Secretary Decision & Directive)' : 'Ministry Secretary Decision & Directive (Est. Code XV 10:1)'}
-              </div>
-              <div style={{ fontSize: '11px', color: '#475569' }}>
-                {'my no.}'} <span style={{ borderBottom: '1px dotted #000', padding: '0 6px', fontWeight: 'bold' }}>{isSecretaryDecided ? secRefNo : '...........................'}</span>
-              </div>
-            </div>
-
-            <div style={{ fontSize: '11px', marginBottom: '18px', lineHeight: 1.5 }}>
-              <span style={{ borderBottom: '1px dotted #000', padding: '0 6px', minWidth: '220px', display: 'inline-block' }}>
-                {existingEndorsement.completedBy?.name || headOfficialName || '......................................................................'}
-              </span><br />
-              <strong>Head of Department.</strong>
-            </div>
-
-            <div style={{ textAlign: 'center', margin: '18px 0 24px', fontSize: '13.5px' }}>
-              <div style={{ borderBottom: '1px dotted #000', width: '240px', margin: '0 auto 6px' }}></div>
-              <div>
-                {isSecretaryApproved ? (
-                  <span>Leave is <strong style={{ textDecoration: 'underline', color: '#16a34a' }}>approved</strong> / <span style={{ textDecoration: 'line-through', color: '#94a3b8' }}>not approved</span></span>
-                ) : isSecretaryRejected ? (
-                  <span>Leave is <span style={{ textDecoration: 'line-through', color: '#94a3b8' }}>approved</span> / <strong style={{ textDecoration: 'underline', color: '#dc2626' }}>not approved</strong></span>
-                ) : (
-                  <span>Leave is approved/not approved</span>
-                )}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '18px', flexWrap: 'wrap', gap: '10px' }}>
-              <div style={{ fontSize: '11px' }}>
-                <div>{'Date}'} <span style={{ borderBottom: '1px dotted #000', padding: '0 6px' }}>{isSecretaryDecided ? secDate : '...........................'}</span></div>
-                <div style={{ marginTop: '10px', fontSize: '10px', color: '#475569', fontStyle: 'italic' }}>
-                  copy to: Secretary to the Prime Minister.
+          {/* Official Part 2: Ministry Secretary Leave Approval / Directive (Est. Code XV 10:1) */}
+          {isSecretaryDecided ? (
+            <div style={{
+              marginTop: '22px',
+              background: isSecretaryApproved ? '#f0fdf4' : '#fef2f2',
+              border: `1.5px dashed ${isSecretaryApproved ? '#86efac' : '#fca5a5'}`,
+              borderRadius: '8px',
+              padding: '16px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 800, color: '#334155' }}>
+                  {language === 'si' ? 'අමාත්‍යාංශ ලේකම්ගේ තීරණය හා නියෝගය (Ministry Secretary Decision & Directive)' : 'Ministry Secretary Decision & Directive (Est. Code XV 10:1)'}
+                </div>
+                <div style={{ fontSize: '11px', color: '#475569' }}>
+                  {'my no.}'} <span style={{ borderBottom: '1px dotted #000', padding: '0 6px', fontWeight: 'bold' }}>{secRefNo}</span>
                 </div>
               </div>
 
-              <div style={{ textAlign: 'center', fontSize: '11px' }}>
-                {secSignature ? (
-                  <img src={secSignature} alt="Secretary Signature" style={{ maxHeight: '44px', maxWidth: '150px', display: 'block', margin: '0 auto 4px' }} />
-                ) : (
-                  <div style={{ height: '32px', borderBottom: '1px dotted #000', width: '170px', margin: '0 auto 4px' }}></div>
-                )}
-                <div style={{ borderTop: '1px dotted #000', paddingTop: '4px' }}>
-                  {secName && <strong style={{ display: 'block', fontSize: '10.5px' }}>{secName}</strong>}
-                  <strong>Secretary.</strong><br />
-                  ministry of <span style={{ borderBottom: '1px dotted #000', padding: '0 4px', fontWeight: 'bold' }}>{secMinistry || ministryName || '...............................'}</span>
+              <div style={{ fontSize: '11px', marginBottom: '18px', lineHeight: 1.5 }}>
+                <span style={{ borderBottom: '1px dotted #000', padding: '0 6px', minWidth: '220px', display: 'inline-block' }}>
+                  {existingEndorsement.completedBy?.name || headOfficialName || '......................................................................'}
+                </span><br />
+                <strong>Head of Department.</strong>
+              </div>
+
+              <div style={{ textAlign: 'center', margin: '18px 0 24px', fontSize: '13.5px' }}>
+                <div style={{ borderBottom: '1px dotted #000', width: '240px', margin: '0 auto 6px' }}></div>
+                <div>
+                  {isSecretaryApproved ? (
+                    <span>Leave is <strong style={{ textDecoration: 'underline', color: '#16a34a' }}>approved</strong> / <span style={{ textDecoration: 'line-through', color: '#94a3b8' }}>not approved</span></span>
+                  ) : (
+                    <span>Leave is <span style={{ textDecoration: 'line-through', color: '#94a3b8' }}>approved</span> / <strong style={{ textDecoration: 'underline', color: '#dc2626' }}>not approved</strong></span>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '18px', flexWrap: 'wrap', gap: '10px' }}>
+                <div style={{ fontSize: '11px' }}>
+                  <div>{'Date}'} <span style={{ borderBottom: '1px dotted #000', padding: '0 6px' }}>{secDate}</span></div>
+                  <div style={{ marginTop: '10px', fontSize: '10px', color: '#475569', fontStyle: 'italic' }}>
+                    copy to: Secretary to the Prime Minister.
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'center', fontSize: '11px' }}>
+                  {secSignature ? (
+                    <img src={secSignature} alt="Secretary Signature" style={{ maxHeight: '44px', maxWidth: '150px', display: 'block', margin: '0 auto 4px' }} />
+                  ) : (
+                    <div style={{ height: '32px', borderBottom: '1px dotted #000', width: '170px', margin: '0 auto 4px' }}></div>
+                  )}
+                  <div style={{ borderTop: '1px dotted #000', paddingTop: '4px' }}>
+                    {secName && <strong style={{ display: 'block', fontSize: '10.5px' }}>{secName}</strong>}
+                    <strong>Secretary.</strong><br />
+                    ministry of <span style={{ borderBottom: '1px dotted #000', padding: '0 4px', fontWeight: 'bold' }}>{secMinistry || ministryName || '...............................'}</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div style={{
+              marginTop: '22px',
+              background: '#f8fafc',
+              border: '1.5px dashed #cbd5e1',
+              borderRadius: '8px',
+              padding: '18px 20px',
+              textAlign: 'center'
+            }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '50%', background: '#fee2e2', color: '#dc2626', marginBottom: '8px' }}>
+                <Lock size={18} />
+              </div>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: '#1e293b' }}>
+                {language === 'si' ? 'අමාත්‍යාංශ ලේකම්ගේ කොටස (Part II: Secretary Approval) තවමත් සම්පූර්ණ කර නොමැත' : 'Part II: Ministry Secretary Approval & Directive is Pending'}
+              </div>
+              <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#64748b' }}>
+                {language === 'si'
+                  ? 'අමාත්‍යාංශ ලේකම් විසින් මෙම කොටස අත්සන් කර සම්පූර්ණ කරන තෙක් කිසිදු පරිශීලකයෙකුට මෙය බැලීමට හෝ බාගත කිරීමට නොහැක.'
+                  : 'This section is strictly locked and cannot be viewed or downloaded until formally signed by the Ministry Secretary.'}
+              </p>
+            </div>
+          )}
 
           <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px dashed #ddd6fe', display: 'flex', justifyContent: 'flex-end', gap: '8px', flexWrap: 'wrap' }}>
             <button
@@ -7404,28 +7487,46 @@ export function DepartmentHeadEndorsementSection({ request, user, language = 'en
               <FileDown size={14} />
               <span>{language === 'si' ? '📄 දෙපාර්තමේන්තු ප්‍රධානී ලිපිය PDF බාගන්න' : '📄 Download Head of Dept Letter PDF'}</span>
             </button>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => printSecretaryApprovalLetterPdf(request)}
-              title={language === 'si' ? 'අමාත්‍යාංශ ලේකම්ගේ නිවාඩු අනුමත ලිපිය (Leave is approved/not approved) PDF ලෙස බාගන්න' : 'Download Ministry Secretary Approval Letter as PDF'}
-              style={{
-                fontSize: '11px',
-                height: '32px',
-                padding: '0 14px',
+            {isSecretaryDecided ? (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => printSecretaryApprovalLetterPdf(request)}
+                title={language === 'si' ? 'අමාත්‍යාංශ ලේකම්ගේ නිවාඩු අනුමත ලිපිය (Leave is approved/not approved) PDF ලෙස බාගන්න' : 'Download Ministry Secretary Approval Letter as PDF'}
+                style={{
+                  fontSize: '11px',
+                  height: '32px',
+                  padding: '0 14px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderColor: '#86efac',
+                  background: '#f0fdf4',
+                  color: '#15803d',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                <FileDown size={14} />
+                <span>{language === 'si' ? '📄 ලේකම්ගේ ලිපිය PDF බාගන්න' : '📄 Download Secretary Letter PDF'}</span>
+              </button>
+            ) : (
+              <span style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
-                borderColor: '#86efac',
-                background: '#f0fdf4',
-                color: '#15803d',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              <FileDown size={14} />
-              <span>{language === 'si' ? '📄 ලේකම්ගේ ලිපිය PDF බාගන්න' : '📄 Download Secretary Letter PDF'}</span>
-            </button>
+                gap: '5px',
+                padding: '6px 12px',
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '6px',
+                color: '#b91c1c',
+                fontSize: '11px',
+                fontWeight: 600
+              }}>
+                <Lock size={13} />
+                <span>{language === 'si' ? 'අමාත්‍යාංශ ලේකම් සම්පූර්ණ කරන තෙක් ලේකම් ලිපිය අගුළුලා ඇත' : 'Secretary Letter locked until signed by Secretary'}</span>
+              </span>
+            )}
           </div>
         </div>
       ) : !isDeptHeadOrAdmin ? (
@@ -7966,28 +8067,46 @@ export function SecretariatMinuteTrailSection({ request, user, language = 'en', 
               {language === 'si' ? currentStageTitleSi : currentStageTitleEn}
             </span>
           )}
-          <button
-            type="button"
-            className="btn-doc-action"
-            onClick={() => printNoteSheetMinisterialPdf(request)}
-            title={language === 'si' ? 'අවසර පත්‍රිකාව සහ අමාත්‍ය ඉදිරිපත් කිරීම වෙනම PDF ලෙස බාගන්න' : 'Download Official Clearance Note Sheet & Ministerial Submission as PDF'}
-            style={{
-              fontSize: '11px',
-              padding: '3px 10px',
+          {allClearances.some(c => c.signature || c.decision) ? (
+            <button
+              type="button"
+              className="btn-doc-action"
+              onClick={() => printNoteSheetMinisterialPdf(request)}
+              title={language === 'si' ? 'අවසර පත්‍රිකාව සහ අමාත්‍ය ඉදිරිපත් කිරීම වෙනම PDF ලෙස බාගන්න' : 'Download Official Clearance Note Sheet & Ministerial Submission as PDF'}
+              style={{
+                fontSize: '11px',
+                padding: '3px 10px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                borderRadius: '6px',
+                border: '1px solid #38bdf8',
+                background: '#f0f9ff',
+                color: '#0369a1',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              <FileDown size={13} />
+              <span>{language === 'si' ? '📄 අවසර පත්‍රිකාව PDF' : '📄 Clearance Sheet PDF'}</span>
+            </button>
+          ) : (
+            <span style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '5px',
+              gap: '4px',
+              padding: '3px 8px',
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
               borderRadius: '6px',
-              border: '1px solid #38bdf8',
-              background: '#f0f9ff',
-              color: '#0369a1',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
-          >
-            <FileDown size={13} />
-            <span>{language === 'si' ? '📄 අවසර පත්‍රිකාව PDF' : '📄 Clearance Sheet PDF'}</span>
-          </button>
+              color: '#b91c1c',
+              fontSize: '11px',
+              fontWeight: 600
+            }}>
+              <Lock size={12} />
+              <span>{language === 'si' ? 'අවසර පත්‍රිකාව අගුළුලා ඇත' : 'Clearance Sheet Locked'}</span>
+            </span>
+          )}
         </div>
       </div>
 
@@ -8529,28 +8648,21 @@ export function SecretariatMinuteTrailSection({ request, user, language = 'en', 
                     ගරු අමාත්‍යාංශය
                   </strong>
                 </div>
-                <button
-                  type="button"
-                  className="btn-doc-action"
-                  onClick={() => printSecretaryApprovalLetterPdf(request)}
-                  title={language === 'si' ? 'අමාත්‍යාංශ ලේකම්ගේ නිවාඩු අනුමත ලිපිය පූර්වදර්ශනය / PDF බාගන්න' : 'Preview / Download Ministry Secretary Approval Letter as PDF'}
-                  style={{
-                    fontSize: '10.5px',
-                    padding: '3px 10px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    borderRadius: '6px',
-                    border: '1px solid #16a34a',
-                    background: '#ffffff',
-                    color: '#15803d',
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                  }}
-                >
-                  <FileDown size={12} />
-                  <span>{language === 'si' ? '📄 ලේකම් ලිපිය PDF (Leave Approved Letter)' : '📄 Secretary Letter PDF'}</span>
-                </button>
+                <span style={{
+                  fontSize: '11px',
+                  padding: '3px 9px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  borderRadius: '6px',
+                  border: '1px solid #bbf7d0',
+                  background: '#ffffff',
+                  color: '#15803d',
+                  fontWeight: 600
+                }}>
+                  <Lock size={12} />
+                  <span>{language === 'si' ? 'අත්සන් කර අනුමත කළ පසු ලේකම් ලිපිය නිකුත් වේ' : 'Letter available upon signing'}</span>
+                </span>
               </div>
               <p style={{ margin: 0, fontSize: '12.5px', color: '#166534', lineHeight: 1.6, fontWeight: 600 }}>
                 ඉහත නම් සඳහන් නිලධාරියාගේ විදේශ නිවාඩු ඉල්ලීම නිර්දේශ කරනු ලබන අතර ඔබගේ අනුමැතිය සඳහා කාරුණිකව ඉදිරිපත් කරමි.
@@ -9141,13 +9253,17 @@ export function PresidentialOrderSection({ request, user, language = 'en', token
 // =========================================================================
 export function printSubjectOfficerNoteSheetPdf(r) {
   if (!r) return;
+  const d = r.details || (r.applicant_name ? r : {});
+  const isCompleted = Boolean(d.officerCompleted && (d.noteSheet || d.officerRemarks || d.officerAssessment));
+  if (!isCompleted) {
+    alert('විෂයභාර නිලධාරී (Subject Officer) විසින් සටහන් පත්‍රිකාව (Note Sheet) තවමත් සම්පූර්ණ කර නොමැති බැවින් බැලීමට හෝ බාගත කිරීමට නොහැක.\n\nThis Note Sheet has not been completed by the Subject Officer yet and cannot be viewed or downloaded.');
+    return;
+  }
   const printWin = window.open('', '_blank');
   if (!printWin) {
     alert('Please allow popups in your browser to view/print the Note Sheet.');
     return;
   }
-
-  const d = r.details || (r.applicant_name ? r : {});
   const refNo = r.id ? `FV-${String(r.id).padStart(4, '0')}` : 'FV-REF';
   const applicantName = d.fullName || r.applicant_name || '—';
   const designation = d.designation || r.designation || '—';
@@ -9302,6 +9418,28 @@ export function ApplicationZipPackageCard({ request, token, language = 'en' }) {
     { key: 'otherDocuments', name: docs.otherDocuments?.name || 'Other Supporting Document', doc: docs.otherDocuments, titleEn: '4. Other Supporting Documents', titleSi: '4. වෙනත් අදාළ උපකාරක ලේඛන' },
   ].filter(item => item.doc);
 
+  const clearances = Array.isArray(d.clearances) ? d.clearances : [];
+  const hasOfficeUseCompleted = Boolean(d.officerCompleted || d.officerAssessment?.total || d.officerSignature);
+  const hasDeptHeadCompleted = Boolean(d.departmentHeadEndorsement && (d.departmentHeadEndorsement.signature || d.departmentHeadEndorsement.myNo));
+  const hasSecretaryCompleted = Boolean(
+    d.secretaryApproval?.signature ||
+    d.secretaryApproval?.signatoryName ||
+    d.secretaryApproval?.letterNumber ||
+    d.secretaryApproval?.signedAt ||
+    clearances.some(c => (c.role === 'secretary' || c.role === 'authorized_official') && (c.signature || c.decision)) ||
+    (request.status === 'Approved' || request.status === 'Pending Presidential Approval')
+  );
+  const hasClearanceCompleted = Boolean(clearances.length > 0 && clearances.some(c => c.signature || c.decision));
+  const hasNoteSheetCompleted = Boolean(d.officerCompleted && (d.noteSheet || d.officerRemarks || d.officerAssessment));
+
+  const completedDocsCount = 1 +
+    (hasOfficeUseCompleted ? 1 : 0) +
+    (hasDeptHeadCompleted ? 1 : 0) +
+    (hasSecretaryCompleted ? 1 : 0) +
+    (hasClearanceCompleted ? 1 : 0) +
+    (hasNoteSheetCompleted ? 1 : 0) +
+    (applicantDocsList.length > 0 ? 1 : 0);
+
   const handleZipDownload = async () => {
     setDownloading(true);
     setDownloadError(null);
@@ -9351,20 +9489,20 @@ export function ApplicationZipPackageCard({ request, token, language = 'en' }) {
                   : `Application Document Package · ${refNo}.zip`}
               </h4>
               <span style={{
-                background: '#1e3a8a',
+                background: completedDocsCount >= 6 ? '#15803d' : '#1e3a8a',
                 color: '#fff',
                 fontSize: '10.5px',
                 fontWeight: 700,
                 padding: '2px 8px',
                 borderRadius: '4px'
               }}>
-                7 Documents (PDF)
+                {completedDocsCount} / 7 Documents Ready (PDF)
               </span>
             </div>
             <p style={{ margin: '3px 0 0 0', fontSize: '11.5px', color: '#64748b' }}>
               {language === 'si'
-                ? 'රාජ්‍ය සේවා විදේශ නිවාඩු රෙගුලාසි යටතේ අවශ්‍ය සියලුම නිල ලේඛන 7 කට්ටලයම එකවර ZIP ගොනුවක් ලෙස බාගත කරගන්න.'
-                : 'All 7 mandatory public service foreign leave documents consolidated into a single ZIP archive named with the application reference number.'}
+                ? 'අදාළ නිලධාරීන් විසින් සම්පූර්ණ කරන ලද නිල ලේඛන පමණක් ZIP පැකේජයට ඇතුළත් වේ. නිලධාරීන් සම්පූර්ණ නොකළ ලේඛන ආරක්ෂිතව අගුළුලා ඇත.'
+                : 'Only documents formally completed and signed by responsible officers are packaged in the ZIP. Incomplete documents remain strictly locked.'}
             </p>
           </div>
         </div>
@@ -9446,7 +9584,7 @@ export function ApplicationZipPackageCard({ request, token, language = 'en' }) {
         {/* Item 2 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#eff6ff', border: '1px solid #93c5fd', color: '#1d4ed8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>2</span>
+            <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: hasOfficeUseCompleted ? '#f0fdf4' : '#f8fafc', border: `1px solid ${hasOfficeUseCompleted ? '#86efac' : '#cbd5e1'}`, color: hasOfficeUseCompleted ? '#166534' : '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>2</span>
             <div>
               <strong style={{ fontSize: '12px', color: '#0f172a', display: 'block' }}>
                 {language === 'si' ? 'කාර්යාලීය ප්‍රයෝජනය සඳහා පමණි PDF' : 'For Office Use Only PDF'}
@@ -9456,21 +9594,28 @@ export function ApplicationZipPackageCard({ request, token, language = 'en' }) {
               </span>
             </div>
           </div>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => printOfficeUseOnlyPdf(request)}
-            style={{ height: '26px', padding: '0 8px', fontSize: '10.5px', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#1e40af', borderColor: '#bfdbfe', background: '#eff6ff', flexShrink: 0 }}
-          >
-            <FileDown size={12} />
-            <span>{language === 'si' ? 'PDF බලන්න' : 'View PDF'}</span>
-          </button>
+          {hasOfficeUseCompleted ? (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => printOfficeUseOnlyPdf(request)}
+              style={{ height: '26px', padding: '0 8px', fontSize: '10.5px', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#1e40af', borderColor: '#bfdbfe', background: '#eff6ff', flexShrink: 0 }}
+            >
+              <FileDown size={12} />
+              <span>{language === 'si' ? 'PDF බලන්න' : 'View PDF'}</span>
+            </button>
+          ) : (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', color: '#b91c1c', fontSize: '10.5px', fontWeight: 600 }}>
+              <Lock size={11} />
+              <span>{language === 'si' ? 'විෂයභාර නිලධාරී සම්පූර්ණ කරන තෙක් අගුළුලා ඇත' : 'Locked until verified by Subject Officer'}</span>
+            </span>
+          )}
         </div>
 
         {/* Item 3 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#eff6ff', border: '1px solid #93c5fd', color: '#1d4ed8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>3</span>
+            <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: hasDeptHeadCompleted ? '#f0fdf4' : '#f8fafc', border: `1px solid ${hasDeptHeadCompleted ? '#86efac' : '#cbd5e1'}`, color: hasDeptHeadCompleted ? '#166534' : '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>3</span>
             <div>
               <strong style={{ fontSize: '12px', color: '#0f172a', display: 'block' }}>
                 {language === 'si' ? 'දෙපාර්තමේන්තු ප්‍රධානී ලිපිය PDF' : 'Department Head Letter PDF'}
@@ -9480,21 +9625,28 @@ export function ApplicationZipPackageCard({ request, token, language = 'en' }) {
               </span>
             </div>
           </div>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => printDepartmentHeadLetterPdf(request)}
-            style={{ height: '26px', padding: '0 8px', fontSize: '10.5px', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#1e40af', borderColor: '#bfdbfe', background: '#eff6ff', flexShrink: 0 }}
-          >
-            <FileDown size={12} />
-            <span>{language === 'si' ? 'PDF බලන්න' : 'View PDF'}</span>
-          </button>
+          {hasDeptHeadCompleted ? (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => printDepartmentHeadLetterPdf(request)}
+              style={{ height: '26px', padding: '0 8px', fontSize: '10.5px', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#1e40af', borderColor: '#bfdbfe', background: '#eff6ff', flexShrink: 0 }}
+            >
+              <FileDown size={12} />
+              <span>{language === 'si' ? 'PDF බලන්න' : 'View PDF'}</span>
+            </button>
+          ) : (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', color: '#b91c1c', fontSize: '10.5px', fontWeight: 600 }}>
+              <Lock size={11} />
+              <span>{language === 'si' ? 'ආයතන ප්‍රධානී අත්සන් කරන තෙක් අගුළුලා ඇත' : 'Locked until endorsed by Dept Head'}</span>
+            </span>
+          )}
         </div>
 
         {/* Item 4 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#eff6ff', border: '1px solid #93c5fd', color: '#1d4ed8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>4</span>
+            <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: hasSecretaryCompleted ? '#f0fdf4' : '#f8fafc', border: `1px solid ${hasSecretaryCompleted ? '#86efac' : '#cbd5e1'}`, color: hasSecretaryCompleted ? '#166534' : '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>4</span>
             <div>
               <strong style={{ fontSize: '12px', color: '#0f172a', display: 'block' }}>
                 {language === 'si' ? 'අමාත්‍යාංශ ලේකම් ලිපිය PDF' : 'Secretary Letter PDF'}
@@ -9504,21 +9656,28 @@ export function ApplicationZipPackageCard({ request, token, language = 'en' }) {
               </span>
             </div>
           </div>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => printSecretaryApprovalLetterPdf(request)}
-            style={{ height: '26px', padding: '0 8px', fontSize: '10.5px', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#1e40af', borderColor: '#bfdbfe', background: '#eff6ff', flexShrink: 0 }}
-          >
-            <FileDown size={12} />
-            <span>{language === 'si' ? 'PDF බලන්න' : 'View PDF'}</span>
-          </button>
+          {hasSecretaryCompleted ? (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => printSecretaryApprovalLetterPdf(request)}
+              style={{ height: '26px', padding: '0 8px', fontSize: '10.5px', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#1e40af', borderColor: '#bfdbfe', background: '#eff6ff', flexShrink: 0 }}
+            >
+              <FileDown size={12} />
+              <span>{language === 'si' ? 'PDF බලන්න' : 'View PDF'}</span>
+            </button>
+          ) : (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', color: '#b91c1c', fontSize: '10.5px', fontWeight: 600 }}>
+              <Lock size={11} />
+              <span>{language === 'si' ? 'අමාත්‍යාංශ ලේකම් අනුමත කරන තෙක් අගුළුලා ඇත' : 'Locked until signed by Ministry Secretary'}</span>
+            </span>
+          )}
         </div>
 
         {/* Item 5 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#eff6ff', border: '1px solid #93c5fd', color: '#1d4ed8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>5</span>
+            <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: hasClearanceCompleted ? '#f0fdf4' : '#f8fafc', border: `1px solid ${hasClearanceCompleted ? '#86efac' : '#cbd5e1'}`, color: hasClearanceCompleted ? '#166534' : '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>5</span>
             <div>
               <strong style={{ fontSize: '12px', color: '#0f172a', display: 'block' }}>
                 {language === 'si' ? 'අවසර පත්‍රිකාව PDF (Clearance Sheet)' : 'Clearance Sheet PDF'}
@@ -9528,21 +9687,28 @@ export function ApplicationZipPackageCard({ request, token, language = 'en' }) {
               </span>
             </div>
           </div>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => printNoteSheetMinisterialPdf(request)}
-            style={{ height: '26px', padding: '0 8px', fontSize: '10.5px', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#1e40af', borderColor: '#bfdbfe', background: '#eff6ff', flexShrink: 0 }}
-          >
-            <FileDown size={12} />
-            <span>{language === 'si' ? 'PDF බලන්න' : 'View PDF'}</span>
-          </button>
+          {hasClearanceCompleted ? (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => printNoteSheetMinisterialPdf(request)}
+              style={{ height: '26px', padding: '0 8px', fontSize: '10.5px', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#1e40af', borderColor: '#bfdbfe', background: '#eff6ff', flexShrink: 0 }}
+            >
+              <FileDown size={12} />
+              <span>{language === 'si' ? 'PDF බලන්න' : 'View PDF'}</span>
+            </button>
+          ) : (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', color: '#b91c1c', fontSize: '10.5px', fontWeight: 600 }}>
+              <Lock size={11} />
+              <span>{language === 'si' ? 'අවසර පත්‍රිකාව අත්සන් කරන තෙක් අගුළුලා ඇත' : 'Locked until initialed on Clearance Sheet'}</span>
+            </span>
+          )}
         </div>
 
         {/* Item 6 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#eff6ff', border: '1px solid #93c5fd', color: '#1d4ed8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>6</span>
+            <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: hasNoteSheetCompleted ? '#f0fdf4' : '#f8fafc', border: `1px solid ${hasNoteSheetCompleted ? '#86efac' : '#cbd5e1'}`, color: hasNoteSheetCompleted ? '#166534' : '#64748b', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, flexShrink: 0 }}>6</span>
             <div>
               <strong style={{ fontSize: '12px', color: '#0f172a', display: 'block' }}>
                 {language === 'si' ? 'සටහන් පත්‍රිකාව PDF (Note Sheet PDF)' : 'Note Sheet PDF'}
@@ -9552,15 +9718,22 @@ export function ApplicationZipPackageCard({ request, token, language = 'en' }) {
               </span>
             </div>
           </div>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => printSubjectOfficerNoteSheetPdf(request)}
-            style={{ height: '26px', padding: '0 8px', fontSize: '10.5px', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#1e40af', borderColor: '#bfdbfe', background: '#eff6ff', flexShrink: 0 }}
-          >
-            <FileDown size={12} />
-            <span>{language === 'si' ? 'PDF බලන්න' : 'View PDF'}</span>
-          </button>
+          {hasNoteSheetCompleted ? (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => printSubjectOfficerNoteSheetPdf(request)}
+              style={{ height: '26px', padding: '0 8px', fontSize: '10.5px', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#1e40af', borderColor: '#bfdbfe', background: '#eff6ff', flexShrink: 0 }}
+            >
+              <FileDown size={12} />
+              <span>{language === 'si' ? 'PDF බලන්න' : 'View PDF'}</span>
+            </button>
+          ) : (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', color: '#b91c1c', fontSize: '10.5px', fontWeight: 600 }}>
+              <Lock size={11} />
+              <span>{language === 'si' ? 'සටහන් පත්‍රිකාව සකසන තෙක් අගුළුලා ඇත' : 'Locked until Note Sheet prepared'}</span>
+            </span>
+          )}
         </div>
       </div>
 

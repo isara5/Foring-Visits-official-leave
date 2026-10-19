@@ -39,6 +39,7 @@ import {
   UserPlus,
   Users,
   FolderArchive,
+  Lock,
   X
 } from 'lucide-react';
 import SignaturePad from './signature-pad.jsx';
@@ -784,6 +785,16 @@ function App() {
     const isOfficial = r.leave_type === 'Official duty';
     const d = r.details || {};
     const clearances = Array.isArray(d.secretariatClearances) ? d.secretariatClearances : [];
+    const hasDeptHeadCompleted = Boolean(d.departmentHeadEndorsement && (d.departmentHeadEndorsement.signature || d.departmentHeadEndorsement.myNo));
+    const hasSecretaryCompleted = Boolean(
+      d.secretaryApproval?.signature ||
+      d.secretaryApproval?.signatoryName ||
+      d.secretaryApproval?.letterNumber ||
+      d.secretaryApproval?.signedAt ||
+      clearances.some(c => (c.role === 'secretary' || c.role === 'authorized_official') && (c.signature || c.decision)) ||
+      (r.status === 'Approved' || r.status === 'Pending Presidential Approval')
+    );
+    const hasClearanceCompleted = Boolean(clearances.length > 0 && clearances.some(c => c.signature || c.decision));
     const subjectOfficerClearance = clearances.find(c => c.role === 'reviewer') || (d.officerCompleted ? {
       userName: d.officerCompletedBy?.name || 'Subject Officer',
       userDesignation: 'විෂයභාර නිලධාරී (Subject Officer)',
@@ -886,7 +897,7 @@ function App() {
           </div>
 
           <!-- PAGE 2: Department Head Endorsement (Est. Code XV 10:1) -->
-          ${d.departmentHeadEndorsement ? `
+          ${hasDeptHeadCompleted ? `
             <div style="page-break-before: always; margin-top: 25px; border: 1.5px solid #0f172a; padding: 25px; position: relative;">
               <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px;">
                 <div style="font-size: 11px; line-height: 1.4;">
@@ -900,9 +911,11 @@ function App() {
                     <button class="no-print" onclick="window.opener && window.opener.printDepartmentHeadLetterPdf ? window.opener.printDepartmentHeadLetterPdf(${JSON.stringify(r).replace(/"/g, '&quot;')}) : (window.printDepartmentHeadLetterPdf ? window.printDepartmentHeadLetterPdf(${JSON.stringify(r).replace(/"/g, '&quot;')}) : window.print())" style="font-size: 9.5px; background: #faf5ff; color: #7e22ce; border: 1px solid #d8b4fe; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-weight: 600;">
                       📄 ආයතන ප්‍රධානී ලිපිය වෙනම PDF
                     </button>
-                    <button class="no-print" onclick="window.opener && window.opener.printSecretaryApprovalLetterPdf ? window.opener.printSecretaryApprovalLetterPdf(${JSON.stringify(r).replace(/"/g, '&quot;')}) : (window.printSecretaryApprovalLetterPdf ? window.printSecretaryApprovalLetterPdf(${JSON.stringify(r).replace(/"/g, '&quot;')}) : window.print())" style="font-size: 9.5px; background: #f0fdf4; color: #15803d; border: 1px solid #86efac; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-weight: 600;">
-                      📄 ලේකම් ලිපිය වෙනම PDF
-                    </button>
+                    ${hasSecretaryCompleted ? `
+                      <button class="no-print" onclick="window.opener && window.opener.printSecretaryApprovalLetterPdf ? window.opener.printSecretaryApprovalLetterPdf(${JSON.stringify(r).replace(/"/g, '&quot;')}) : (window.printSecretaryApprovalLetterPdf ? window.printSecretaryApprovalLetterPdf(${JSON.stringify(r).replace(/"/g, '&quot;')}) : window.print())" style="font-size: 9.5px; background: #f0fdf4; color: #15803d; border: 1px solid #86efac; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-weight: 600;">
+                        📄 ලේකම් ලිපිය වෙනම PDF
+                      </button>
+                    ` : ''}
                   </div>
                 </div>
 
@@ -975,63 +988,70 @@ function App() {
                 </div>
               </div>
 
-              <!-- PART 2: MINISTRY SECRETARY APPROVAL & DIRECTIVE TO HEAD OF DEPARTMENT (Est. Code XV 10:1 - Image 2) -->
-              <div style="margin-top: 36px; border-top: 2px dashed #0f172a; padding-top: 24px;">
-                <div style="display: flex; justify-content: flex-end; margin-bottom: 20px; font-size: 11px;">
-                  <div>
-                    my no.} <span style="display: inline-block; border-bottom: 1px dotted #000; min-width: 150px; padding: 0 4px; font-weight: bold;">
-                      ${secretaryClearance?.myNo || (r.status === 'Approved' ? `MCS/SEC/${new Date().getFullYear()}/FV-${String(r.id).padStart(4, '0')}` : '...........................')}
-                    </span>
-                  </div>
-                </div>
-
-                <div style="text-align: left; margin-bottom: 24px; font-size: 11px; line-height: 1.5;">
-                  <span style="display: inline-block; border-bottom: 1px dotted #000; min-width: 240px;">
-                    ${d.departmentHeadEndorsement?.completedBy?.name || '......................................................................'}
-                  </span><br />
-                  Head of Department.
-                </div>
-
-                <div style="text-align: center; margin: 26px 0 32px; font-size: 13px;">
-                  <div style="border-bottom: 1px dotted #000; width: 250px; margin: 0 auto 6px;"></div>
-                  <div>
-                    ${
-                      r.status === 'Approved' || secretaryClearance?.decision === 'approve'
-                        ? 'Leave is <strong style="text-decoration: underline; color: #16a34a;">approved</strong> / <span style="text-decoration: line-through; color: #94a3b8;">not approved</span>'
-                        : r.status === 'Rejected' || secretaryClearance?.decision === 'reject'
-                        ? 'Leave is <span style="text-decoration: line-through; color: #94a3b8;">approved</span> / <strong style="text-decoration: underline; color: #dc2626;">not approved</strong>'
-                        : 'Leave is approved/not approved'
-                    }
-                  </div>
-                </div>
-
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 28px;">
-                  <div style="font-size: 11px;">
+              <!-- PART 2: MINISTRY SECRETARY APPROVAL & DIRECTIVE TO HEAD OF DEPARTMENT (Est. Code XV 10:1) -->
+              ${hasSecretaryCompleted ? `
+                <div style="margin-top: 36px; border-top: 2px dashed #0f172a; padding-top: 24px;">
+                  <div style="display: flex; justify-content: flex-end; margin-bottom: 20px; font-size: 11px;">
                     <div>
-                      Date} <span style="display: inline-block; border-bottom: 1px dotted #000; min-width: 120px; padding: 0 4px;">
-                        ${secretaryClearance?.date || (r.status === 'Approved' ? r.updated_at?.slice(0, 10) : '...........................')}
+                      my no.} <span style="display: inline-block; border-bottom: 1px dotted #000; min-width: 150px; padding: 0 4px; font-weight: bold;">
+                        ${secretaryClearance?.myNo || (r.status === 'Approved' ? `MCS/SEC/${new Date().getFullYear()}/FV-${String(r.id).padStart(4, '0')}` : '...........................')}
                       </span>
                     </div>
-                    <div style="margin-top: 14px; font-size: 10px; color: #475569; font-style: italic;">
-                      copy to: Secretary to the Prime Minister.
+                  </div>
+
+                  <div style="text-align: left; margin-bottom: 24px; font-size: 11px; line-height: 1.5;">
+                    <span style="display: inline-block; border-bottom: 1px dotted #000; min-width: 240px;">
+                      ${d.departmentHeadEndorsement?.completedBy?.name || '......................................................................'}
+                    </span><br />
+                    Head of Department.
+                  </div>
+
+                  <div style="text-align: center; margin: 26px 0 32px; font-size: 13px;">
+                    <div style="border-bottom: 1px dotted #000; width: 250px; margin: 0 auto 6px;"></div>
+                    <div>
+                      ${
+                        r.status === 'Approved' || secretaryClearance?.decision === 'approve'
+                          ? 'Leave is <strong style="text-decoration: underline; color: #16a34a;">approved</strong> / <span style="text-decoration: line-through; color: #94a3b8;">not approved</span>'
+                          : r.status === 'Rejected' || secretaryClearance?.decision === 'reject'
+                          ? 'Leave is <span style="text-decoration: line-through; color: #94a3b8;">approved</span> / <strong style="text-decoration: underline; color: #dc2626;">not approved</strong>'
+                          : 'Leave is approved/not approved'
+                      }
                     </div>
                   </div>
 
-                  <div style="text-align: center; font-size: 10.5px; line-height: 1.35;">
-                    ${secretaryClearance?.signature ? `<img src="${secretaryClearance.signature}" style="max-height: 44px; display: block; margin: 0 auto 4px;" alt="Secretary Signature" />` : '<div style="height: 32px; border-bottom: 1px dotted #000; width: 170px; margin: 0 auto 4px;"></div>'}
-                    <div style="border-top: 1px dotted #000; padding-top: 4px;">
-                      ${secretaryClearance?.userName ? `<strong style="display: block; font-size: 10px;">${secretaryClearance.userName}</strong>` : (r.status === 'Approved' ? '<strong style="display: block; font-size: 10px;">වරුෂණ ශ්‍රී ධනපාල</strong>' : '')}
-                      <strong>Secretary.</strong><br />
-                      ministry of <span style="border-bottom: 1px dotted #000; padding: 0 4px; font-weight: bold;">${secretaryClearance?.ministryName || d.departmentHeadEndorsement?.ministryName || '...............................'}</span>
+                  <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 28px;">
+                    <div style="font-size: 11px;">
+                      <div>
+                        Date} <span style="display: inline-block; border-bottom: 1px dotted #000; min-width: 120px; padding: 0 4px;">
+                          ${secretaryClearance?.date || (r.status === 'Approved' ? r.updated_at?.slice(0, 10) : '...........................')}
+                        </span>
+                      </div>
+                      <div style="margin-top: 14px; font-size: 10px; color: #475569; font-style: italic;">
+                        copy to: Secretary to the Prime Minister.
+                      </div>
+                    </div>
+
+                    <div style="text-align: center; font-size: 10.5px; line-height: 1.35;">
+                      ${secretaryClearance?.signature ? `<img src="${secretaryClearance.signature}" style="max-height: 44px; display: block; margin: 0 auto 4px;" alt="Secretary Signature" />` : '<div style="height: 32px; border-bottom: 1px dotted #000; width: 170px; margin: 0 auto 4px;"></div>'}
+                      <div style="border-top: 1px dotted #000; padding-top: 4px;">
+                        ${secretaryClearance?.userName ? `<strong style="display: block; font-size: 10px;">${secretaryClearance.userName}</strong>` : (r.status === 'Approved' ? '<strong style="display: block; font-size: 10px;">වරුෂණ ශ්‍රී ධනපාල</strong>' : '')}
+                        <strong>Secretary.</strong><br />
+                        ministry of <span style="border-bottom: 1px dotted #000; padding: 0 4px; font-weight: bold;">${secretaryClearance?.ministryName || d.departmentHeadEndorsement?.ministryName || '...............................'}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              ` : `
+                <div style="margin-top: 36px; border-top: 2px dashed #94a3b8; padding: 22px; text-align: center; background: #f8fafc; border-radius: 6px;">
+                  <div style="font-weight: bold; color: #475569; font-size: 11px;">🔒 අමාත්‍යාංශ ලේකම් අනුමැතිය (Part II: Ministry Secretary Approval) තවමත් සම්පූර්ණ කර නොමැත</div>
+                  <div style="font-size: 10px; color: #94a3b8; margin-top: 4px;">Pending Ministry Secretary Action · ලේකම්වරයා විසින් අනුමැතිය සම්පූර්ණ කරන තෙක් මෙම කොටස බැලීමට නොහැක</div>
+                </div>
+              `}
             </div>
           ` : ''}
 
           <!-- PAGE 3: Official Clearance Sheet (අවසර පත්‍රිකාව) -->
-          ${(subjectOfficerClearance || intermediateClearances.length > 0 || secretaryClearance) ? `
+          ${hasClearanceCompleted ? `
             <div style="page-break-before: always; margin-top: 25px; border: 1.5px solid #0f172a; padding: 25px; position: relative;">
               <!-- Header -->
               <div style="text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 16px;">
@@ -3164,7 +3184,20 @@ function DetailModal({
   onDelete,
   onReject
 }) {
-  const hasOfficerSection = Boolean(request.details?.officerCompleted || request.details?.officerAssessment);
+  const d = request.details || (request.applicant_name ? request : {});
+  const clearances = Array.isArray(d.secretariatClearances) ? d.secretariatClearances : [];
+  const hasOfficeUsePart = Boolean(d.officerCompleted || d.officerAssessment?.total || d.officerSignature);
+  const hasDeptHeadPart = Boolean(d.departmentHeadEndorsement && (d.departmentHeadEndorsement.signature || d.departmentHeadEndorsement.myNo));
+  const hasSecretaryPart = Boolean(
+    d.secretaryApproval?.signature ||
+    d.secretaryApproval?.signatoryName ||
+    d.secretaryApproval?.letterNumber ||
+    d.secretaryApproval?.signedAt ||
+    clearances.some(c => (c.role === 'secretary' || c.role === 'authorized_official') && (c.signature || c.decision)) ||
+    (request.status === 'Approved' || request.status === 'Pending Presidential Approval')
+  );
+  const hasClearanceSheetPart = Boolean(clearances.length > 0 && clearances.some(c => c.signature || c.decision));
+
   const userRole = user?.role || 'applicant';
   const isAdmin = userRole === 'admin';
   const isOwner = user?.id === request.applicant_id || userRole === 'applicant';
@@ -3241,7 +3274,7 @@ function DetailModal({
               <FileDown size={14} />
               <span>{language === 'si' ? 'General 126 PDF' : 'General 126 PDF'}</span>
             </button>
-            {hasOfficerSection && (
+            {hasOfficeUsePart && (
               <button
                 type="button"
                 className="secondary-button"
@@ -3264,69 +3297,75 @@ function DetailModal({
                 <span>{language === 'si' ? 'Office Use (නිවාඩු විස්තර) PDF' : 'For Office Use Only PDF'}</span>
               </button>
             )}
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => printDepartmentHeadLetterPdf(request)}
-              title={language === 'si' ? 'දෙපාර්තමේන්තු ප්‍රධානියා පුරවනු ලබන ලිපිය වෙනම PDF ලෙස බාගන්න' : 'Download Head of Department Forwarding Letter as Separate PDF'}
-              style={{
-                height: '32px',
-                padding: '0 12px',
-                fontSize: '11px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                borderColor: '#c084fc',
-                background: '#faf5ff',
-                color: '#7e22ce',
-                fontWeight: 600
-              }}
-            >
-              <FileDown size={14} />
-              <span>{language === 'si' ? 'ආයතන ප්‍රධානී ලිපිය PDF' : 'Dept Head Letter PDF'}</span>
-            </button>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => printSecretaryApprovalLetterPdf(request)}
-              title={language === 'si' ? 'අමාත්‍යාංශ ලේකම්ගේ නිවාඩු අනුමත ලිපිය (Leave is approved/not approved) PDF ලෙස බාගන්න' : 'Download Ministry Secretary Approval Letter (Leave is approved/not approved) as Separate PDF'}
-              style={{
-                height: '32px',
-                padding: '0 12px',
-                fontSize: '11px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                borderColor: '#86efac',
-                background: '#f0fdf4',
-                color: '#15803d',
-                fontWeight: 600
-              }}
-            >
-              <FileDown size={14} />
-              <span>{language === 'si' ? 'ලේකම්ගේ ලිපිය PDF' : 'Secretary Letter PDF'}</span>
-            </button>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => printNoteSheetMinisterialPdf(request)}
-              title={language === 'si' ? 'අවසර පත්‍රිකාව සහ අමාත්‍ය ඉදිරිපත් කිරීම වෙනම PDF ලෙස බාගන්න' : 'Download Clearance Sheet & Ministerial Submission PDF'}
-              style={{
-                height: '32px',
-                padding: '0 12px',
-                fontSize: '11px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                borderColor: '#38bdf8',
-                background: '#f0f9ff',
-                color: '#0369a1',
-                fontWeight: 600
-              }}
-            >
-              <FileDown size={14} />
-              <span>{language === 'si' ? 'අවසර පත්‍රිකාව PDF' : 'Clearance Sheet PDF'}</span>
-            </button>
+            {hasDeptHeadPart && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => printDepartmentHeadLetterPdf(request)}
+                title={language === 'si' ? 'දෙපාර්තමේන්තු ප්‍රධානියා පුරවනු ලබන ලිපිය වෙනම PDF ලෙස බාගන්න' : 'Download Head of Department Forwarding Letter as Separate PDF'}
+                style={{
+                  height: '32px',
+                  padding: '0 12px',
+                  fontSize: '11px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderColor: '#c084fc',
+                  background: '#faf5ff',
+                  color: '#7e22ce',
+                  fontWeight: 600
+                }}
+              >
+                <FileDown size={14} />
+                <span>{language === 'si' ? 'ආයතන ප්‍රධානී ලිපිය PDF' : 'Dept Head Letter PDF'}</span>
+              </button>
+            )}
+            {hasSecretaryPart && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => printSecretaryApprovalLetterPdf(request)}
+                title={language === 'si' ? 'අමාත්‍යාංශ ලේකම්ගේ නිවාඩු අනුමත ලිපිය (Leave is approved/not approved) PDF ලෙස බාගන්න' : 'Download Ministry Secretary Approval Letter (Leave is approved/not approved) as Separate PDF'}
+                style={{
+                  height: '32px',
+                  padding: '0 12px',
+                  fontSize: '11px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderColor: '#86efac',
+                  background: '#f0fdf4',
+                  color: '#15803d',
+                  fontWeight: 600
+                }}
+              >
+                <FileDown size={14} />
+                <span>{language === 'si' ? 'ලේකම්ගේ ලිපිය PDF' : 'Secretary Letter PDF'}</span>
+              </button>
+            )}
+            {hasClearanceSheetPart && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => printNoteSheetMinisterialPdf(request)}
+                title={language === 'si' ? 'අවසර පත්‍රිකාව සහ අමාත්‍ය ඉදිරිපත් කිරීම වෙනම PDF ලෙස බාගන්න' : 'Download Clearance Sheet & Ministerial Submission PDF'}
+                style={{
+                  height: '32px',
+                  padding: '0 12px',
+                  fontSize: '11px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderColor: '#38bdf8',
+                  background: '#f0f9ff',
+                  color: '#0369a1',
+                  fontWeight: 600
+                }}
+              >
+                <FileDown size={14} />
+                <span>{language === 'si' ? 'අවසර පත්‍රිකාව PDF' : 'Clearance Sheet PDF'}</span>
+              </button>
+            )}
             {/* Edit / Resubmit Button */}
             {canEdit && onEdit && (
               <button

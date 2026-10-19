@@ -576,41 +576,65 @@ export async function generateRequestZip(request) {
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), `zip_${refNo}_`));
 
   try {
-    // 1. General 126 PDF
+    const d = request.details || {};
+    const clearances = Array.isArray(d.secretariatClearances) ? d.secretariatClearances : [];
+
+    // 1. General 126 PDF (Applicant's part - always included once application exists)
     const html1 = getGeneral126Html(request);
     const pdf1Path = path.join(workDir, '1_General_126_Application.pdf');
     await htmlToPdf(html1, pdf1Path);
     zip.file('1_General_126_Application.pdf', fs.readFileSync(pdf1Path));
 
-    // 2. For Office Use Only PDF
-    const html2 = getOfficeUseOnlyHtml(request);
-    const pdf2Path = path.join(workDir, '2_For_Office_Use_Only_Leave_Particulars.pdf');
-    await htmlToPdf(html2, pdf2Path);
-    zip.file('2_For_Office_Use_Only_Leave_Particulars.pdf', fs.readFileSync(pdf2Path));
+    // 2. For Office Use Only PDF (Only if Subject Officer has completed leave entitlement verification)
+    const hasOfficeUseCompleted = Boolean(d.officerCompleted || d.officerAssessment?.total || d.officerSignature);
+    if (hasOfficeUseCompleted) {
+      const html2 = getOfficeUseOnlyHtml(request);
+      const pdf2Path = path.join(workDir, '2_For_Office_Use_Only_Leave_Particulars.pdf');
+      await htmlToPdf(html2, pdf2Path);
+      zip.file('2_For_Office_Use_Only_Leave_Particulars.pdf', fs.readFileSync(pdf2Path));
+    }
 
-    // 3. Department Head Letter PDF
-    const html3 = getDeptHeadLetterHtml(request);
-    const pdf3Path = path.join(workDir, '3_Department_Head_Letter.pdf');
-    await htmlToPdf(html3, pdf3Path);
-    zip.file('3_Department_Head_Letter.pdf', fs.readFileSync(pdf3Path));
+    // 3. Department Head Letter PDF (Only if Head of Department has completed institutional endorsement)
+    const hasDeptHeadCompleted = Boolean(d.departmentHeadEndorsement && (d.departmentHeadEndorsement.signature || d.departmentHeadEndorsement.myNo));
+    if (hasDeptHeadCompleted) {
+      const html3 = getDeptHeadLetterHtml(request);
+      const pdf3Path = path.join(workDir, '3_Department_Head_Letter.pdf');
+      await htmlToPdf(html3, pdf3Path);
+      zip.file('3_Department_Head_Letter.pdf', fs.readFileSync(pdf3Path));
+    }
 
-    // 4. Secretary Approval Letter PDF
-    const html4 = getSecretaryLetterHtml(request);
-    const pdf4Path = path.join(workDir, '4_Secretary_Approval_Letter.pdf');
-    await htmlToPdf(html4, pdf4Path);
-    zip.file('4_Secretary_Approval_Letter.pdf', fs.readFileSync(pdf4Path));
+    // 4. Secretary Approval Letter PDF (Only if Ministry Secretary has completed leave approval)
+    const hasSecretaryCompleted = Boolean(
+      d.secretaryApproval?.signature ||
+      d.secretaryApproval?.signatoryName ||
+      d.secretaryApproval?.letterNumber ||
+      clearances.some(c => (c.role === 'secretary' || c.role === 'authorized_official') && (c.signature || c.decision)) ||
+      (request.status === 'Approved' || request.status === 'Pending Presidential Approval')
+    );
+    if (hasSecretaryCompleted) {
+      const html4 = getSecretaryLetterHtml(request);
+      const pdf4Path = path.join(workDir, '4_Secretary_Approval_Letter.pdf');
+      await htmlToPdf(html4, pdf4Path);
+      zip.file('4_Secretary_Approval_Letter.pdf', fs.readFileSync(pdf4Path));
+    }
 
-    // 5. Hierarchy Clearance Sheet PDF
-    const html5 = getClearanceSheetHtml(request);
-    const pdf5Path = path.join(workDir, '5_Hierarchy_Clearance_Sheet.pdf');
-    await htmlToPdf(html5, pdf5Path);
-    zip.file('5_Hierarchy_Clearance_Sheet.pdf', fs.readFileSync(pdf5Path));
+    // 5. Hierarchy Clearance Sheet PDF (Only if Secretariat officers have completed clearance minutes)
+    const hasClearanceCompleted = clearances.length > 0 && clearances.some(c => c.signature || c.decision);
+    if (hasClearanceCompleted) {
+      const html5 = getClearanceSheetHtml(request);
+      const pdf5Path = path.join(workDir, '5_Hierarchy_Clearance_Sheet.pdf');
+      await htmlToPdf(html5, pdf5Path);
+      zip.file('5_Hierarchy_Clearance_Sheet.pdf', fs.readFileSync(pdf5Path));
+    }
 
-    // 6. Subject Officer Note Sheet PDF
-    const html6 = getNoteSheetHtml(request);
-    const pdf6Path = path.join(workDir, '6_Subject_Officer_Note_Sheet.pdf');
-    await htmlToPdf(html6, pdf6Path);
-    zip.file('6_Subject_Officer_Note_Sheet.pdf', fs.readFileSync(pdf6Path));
+    // 6. Subject Officer Note Sheet PDF (Only if Subject Officer has prepared Note Sheet)
+    const hasNoteSheetCompleted = Boolean(d.officerCompleted && (d.noteSheet || d.officerRemarks || d.officerAssessment));
+    if (hasNoteSheetCompleted) {
+      const html6 = getNoteSheetHtml(request);
+      const pdf6Path = path.join(workDir, '6_Subject_Officer_Note_Sheet.pdf');
+      await htmlToPdf(html6, pdf6Path);
+      zip.file('6_Subject_Officer_Note_Sheet.pdf', fs.readFileSync(pdf6Path));
+    }
 
     // 7. Applicant Uploaded Documents (only one by one pdf)
     const docs = request.details?.documents || {};
