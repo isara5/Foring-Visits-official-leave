@@ -16,6 +16,7 @@ import {
   CircleHelp,
   Clock,
   Download,
+  Edit3,
   FileDown,
   FilePlus2,
   FileSpreadsheet,
@@ -1764,9 +1765,9 @@ function App() {
                           <td>
                             <div className="person-cell">
                               <span className="mini-avatar">
-                                {request.applicant_name.split(' ').map((p) => p[0]).slice(0, 2).join('')}
+                                {(request.applicant_name || 'Applicant').split(' ').filter(Boolean).map((p) => p[0]).slice(0, 2).join('')}
                               </span>
-                              <span>{request.applicant_name}</span>
+                              <span>{request.applicant_name || '—'}</span>
                             </div>
                           </td>
                           <td className="destination-cell">{request.destination}</td>
@@ -1824,7 +1825,7 @@ function App() {
                               const userRole = user.role;
                               const isAdmin = userRole === 'admin';
                               const isOwner = user.id === request.applicant_id || userRole === 'applicant';
-                              const isEditableStatus = ['Pending Department Head Approval', 'Pending Review', 'Returned'].includes(request.status);
+                              const isEditableStatus = ['Pending Department Head Approval', 'Pending Review', 'Returned', 'Rejected'].includes(request.status);
                               const canEditRow = isAdmin || (isOwner && isEditableStatus);
                               const canDeleteRow = isAdmin || (isOwner && isEditableStatus);
                               const canRejectRow = !['Approved', 'Rejected'].includes(request.status) &&
@@ -1837,8 +1838,8 @@ function App() {
                                       type="button"
                                       className="icon-button"
                                       onClick={(e) => { e.stopPropagation(); setEditingRequest(request); }}
-                                      title={language === 'si' ? 'අයදුම්පත සංස්කරණය කරන්න' : 'Edit Application'}
-                                      style={{ color: '#2563eb', padding: '4px' }}
+                                      title={language === 'si' ? (request.status === 'Rejected' ? 'අඩුපාඩු සකසා නැවත ඉදිරිපත් කරන්න' : 'අයදුම්පත සංස්කරණය කරන්න') : (request.status === 'Rejected' ? 'Fix Deficiencies & Resubmit' : 'Edit Application')}
+                                      style={{ color: request.status === 'Rejected' ? '#dc2626' : '#2563eb', padding: '4px' }}
                                     >
                                       <Edit3 size={14} />
                                     </button>
@@ -2071,10 +2072,10 @@ function App() {
                           <td onClick={() => handleOpenRequest(request)}>
                             <div className="person-cell">
                               <span className="mini-avatar">
-                                {request.applicant_name.split(' ').map((p) => p[0]).slice(0, 2).join('')}
+                                {(request.applicant_name || 'Applicant').split(' ').filter(Boolean).map((p) => p[0]).slice(0, 2).join('')}
                               </span>
                               <div>
-                                <strong>{request.applicant_name}</strong>
+                                <strong>{request.applicant_name || '—'}</strong>
                                 <span style={{ display: 'block', fontSize: '9px', color: '#8898aa' }}>{request.applicant_email}</span>
                               </div>
                             </div>
@@ -2134,7 +2135,7 @@ function App() {
                               const userRole = user.role;
                               const isAdmin = userRole === 'admin';
                               const isOwner = user.id === request.applicant_id || userRole === 'applicant';
-                              const isEditableStatus = ['Pending Department Head Approval', 'Pending Review', 'Returned'].includes(request.status);
+                              const isEditableStatus = ['Pending Department Head Approval', 'Pending Review', 'Returned', 'Rejected'].includes(request.status);
                               const canEditRow = isAdmin || (isOwner && isEditableStatus);
                               const canDeleteRow = isAdmin || (isOwner && isEditableStatus);
                               const canRejectRow = !['Approved', 'Rejected'].includes(request.status) &&
@@ -2147,11 +2148,19 @@ function App() {
                                       type="button"
                                       className="secondary-button"
                                       onClick={(e) => { e.stopPropagation(); setEditingRequest(request); }}
-                                      title={language === 'si' ? 'අයදුම්පත සංස්කරණය කරන්න' : 'Edit Application'}
-                                      style={{ height: '30px', padding: '0 8px', fontSize: '10px', color: '#1d4ed8', borderColor: '#bfdbfe', background: '#eff6ff' }}
+                                      title={language === 'si' ? (request.status === 'Rejected' ? 'අඩුපාඩු සකසා නැවත ඉදිරිපත් කරන්න' : 'අයදුම්පත සංස්කරණය කරන්න') : (request.status === 'Rejected' ? 'Fix Deficiencies & Resubmit' : 'Edit Application')}
+                                      style={{
+                                        height: '30px',
+                                        padding: '0 8px',
+                                        fontSize: '10px',
+                                        color: request.status === 'Rejected' ? '#b91c1c' : '#1d4ed8',
+                                        borderColor: request.status === 'Rejected' ? '#fca5a5' : '#bfdbfe',
+                                        background: request.status === 'Rejected' ? '#fef2f2' : '#eff6ff',
+                                        fontWeight: request.status === 'Rejected' ? 700 : 500
+                                      }}
                                     >
                                       <Edit3 size={13} />
-                                      <span>{language === 'si' ? 'සංස්කරණය' : 'Edit'}</span>
+                                      <span>{language === 'si' ? (request.status === 'Rejected' ? 'අඩුපාඩු හදන්න' : 'සංස්කරණය') : (request.status === 'Rejected' ? 'Fix & Resubmit' : 'Edit')}</span>
                                     </button>
                                   )}
                                   {canDeleteRow && (
@@ -2636,10 +2645,10 @@ function App() {
                           <td>
                             <div className="person-cell">
                               <span className="mini-avatar">
-                                {request.applicant_name.split(' ').map((p) => p[0]).slice(0, 2).join('')}
+                                {(request.applicant_name || 'Applicant').split(' ').filter(Boolean).map((p) => p[0]).slice(0, 2).join('')}
                               </span>
                               <div>
-                                <strong>{request.applicant_name}</strong>
+                                <strong>{request.applicant_name || '—'}</strong>
                                 <span style={{ display: 'block', fontSize: '9px', color: '#8898aa' }}>{request.applicant_email}</span>
                               </div>
                             </div>
@@ -3159,7 +3168,7 @@ function DetailModal({
   const userRole = user?.role || 'applicant';
   const isAdmin = userRole === 'admin';
   const isOwner = user?.id === request.applicant_id || userRole === 'applicant';
-  const isEditableStatus = ['Pending Department Head Approval', 'Pending Review', 'Returned'].includes(request.status);
+  const isEditableStatus = ['Pending Department Head Approval', 'Pending Review', 'Returned', 'Rejected'].includes(request.status);
   const canEdit = isAdmin || (isOwner && isEditableStatus);
   const canDelete = isAdmin || (isOwner && isEditableStatus);
   const canReject = !['Approved', 'Rejected'].includes(request.status) &&
@@ -3318,13 +3327,13 @@ function DetailModal({
               <FileDown size={14} />
               <span>{language === 'si' ? 'අවසර පත්‍රිකාව PDF' : 'Clearance Sheet PDF'}</span>
             </button>
-            {/* Edit Button */}
+            {/* Edit / Resubmit Button */}
             {canEdit && onEdit && (
               <button
                 type="button"
                 className="secondary-button"
                 onClick={() => onEdit(request)}
-                title={language === 'si' ? 'අයදුම්පත සංස්කරණය කරන්න' : 'Edit Application'}
+                title={language === 'si' ? (request.status === 'Rejected' ? 'අඩුපාඩු සකසා නැවත ඉදිරිපත් කරන්න' : 'අයදුම්පත සංස්කරණය කරන්න') : (request.status === 'Rejected' ? 'Fix Deficiencies & Resubmit' : 'Edit Application')}
                 style={{
                   height: '32px',
                   padding: '0 12px',
@@ -3332,14 +3341,14 @@ function DetailModal({
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  borderColor: '#93c5fd',
-                  background: '#eff6ff',
-                  color: '#1d4ed8',
-                  fontWeight: 600
+                  borderColor: request.status === 'Rejected' ? '#f87171' : '#93c5fd',
+                  background: request.status === 'Rejected' ? '#fef2f2' : '#eff6ff',
+                  color: request.status === 'Rejected' ? '#b91c1c' : '#1d4ed8',
+                  fontWeight: 700
                 }}
               >
                 <Edit3 size={13} />
-                <span>{language === 'si' ? 'සංස්කරණය (Edit)' : 'Edit'}</span>
+                <span>{language === 'si' ? (request.status === 'Rejected' ? 'අඩුපාඩු සකසා නැවත ඉදිරිපත් කරන්න (Resubmit)' : 'සංස්කරණය (Edit)') : (request.status === 'Rejected' ? 'Fix & Resubmit' : 'Edit')}</span>
               </button>
             )}
 
@@ -3703,4 +3712,84 @@ function formatDate(value) {
   return new Intl.DateTimeFormat('en', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${value}T12:00:00`));
 }
 
-createRoot(document.getElementById('root')).render(<App />);
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('Portal uncaught runtime error:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#f8fafc',
+          padding: '24px',
+          fontFamily: "'Inter', sans-serif"
+        }}>
+          <div style={{
+            maxWidth: '560px',
+            width: '100%',
+            background: '#ffffff',
+            borderRadius: '16px',
+            padding: '32px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+            border: '1px solid #fee2e2',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              background: '#fee2e2',
+              color: '#dc2626',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '16px'
+            }}>
+              <AlertCircle size={28} />
+            </div>
+            <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', margin: '0 0 8px 0' }}>
+              යෙදුමේ දෝෂයක් සිදු විය (Application Error)
+            </h2>
+            <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 20px 0', lineHeight: 1.5 }}>
+              {this.state.error?.message || 'An unexpected error occurred while rendering the page.'}
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              style={{
+                background: '#1d4ed8',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '10px 20px',
+                fontWeight: 700,
+                fontSize: '13px',
+                cursor: 'pointer'
+              }}
+            >
+              නැවත පූරණය කරන්න (Reload Page)
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+createRoot(document.getElementById('root')).render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
+);

@@ -1073,18 +1073,67 @@ app.put('/api/requests/:id', authenticate, (req, res) => {
     return res.status(403).json({ error: 'You are not authorized to edit this request.' });
   }
 
-  // Editable statuses
-  const editableStatuses = ['Pending Department Head Approval', 'Pending Review', 'Returned'];
+  // Editable statuses (including Rejected)
+  const editableStatuses = ['Pending Department Head Approval', 'Pending Review', 'Returned', 'Rejected'];
   if (!isAdmin && !editableStatuses.includes(request.status)) {
-    return res.status(400).json({ error: `Cannot edit request in status "${request.status}". Only pending or returned requests can be edited.` });
+    return res.status(400).json({ error: `Cannot edit request in status "${request.status}". Only pending, returned, or rejected requests can be edited.` });
   }
 
-  const { destination, purpose, startDate, endDate, leaveType, details, signature } = req.body || {};
+  const { destination, purpose, startDate, endDate, leaveType, details, signature, resubmit, correctionNotes } = req.body || {};
+  const isResubmitting = resubmit || ['Rejected', 'Returned'].includes(request.status);
   const currentDetails = JSON.parse(request.details_json || '{}');
-  const mergedDetails = {
+
+  let mergedDetails = {
     ...currentDetails,
     ...(details || {}),
   };
+
+  let newStatus = request.status;
+
+  if (isResubmitting) {
+    newStatus = 'Pending Department Head Approval';
+    const rejectionHistory = [...(currentDetails.rejectionHistory || [])];
+    if (currentDetails.rejectionRecord) {
+      rejectionHistory.push({
+        ...currentDetails.rejectionRecord,
+        archivedAt: new Date().toISOString(),
+        resolvedByResubmission: true
+      });
+    }
+
+    const appliedCorrectionNotes = (correctionNotes || details?.correctionNotes || '').trim();
+    const resubmissionRecord = {
+      resubmittedAt: new Date().toISOString(),
+      resubmittedDate: new Date().toISOString().slice(0, 10),
+      resubmittedBy: {
+        id: req.user.id,
+        name: req.user.name,
+        role: req.user.role,
+        email: req.user.email
+      },
+      correctionNotes: appliedCorrectionNotes,
+      previousStatus: request.status
+    };
+
+    const resubmissionHistory = [...(currentDetails.resubmissionHistory || []), resubmissionRecord];
+
+    mergedDetails = {
+      ...mergedDetails,
+      rejectionRecord: null,
+      rejectionHistory,
+      resubmissionRecord,
+      resubmissionHistory,
+      correctionNotes: appliedCorrectionNotes,
+      isResubmitted: true,
+      // Reset stages so hierarchy approval cycle restarts afresh
+      departmentHeadEndorsement: null,
+      officerCompleted: false,
+      officerAssessment: null,
+      secretariatClearance: null,
+      secretaryApproval: null,
+      presidentialDecision: null
+    };
+  }
 
   const newDestination = destination?.trim() || request.destination;
   const newPurpose = purpose?.trim() || request.purpose;
@@ -1100,9 +1149,10 @@ app.put('/api/requests/:id', authenticate, (req, res) => {
   try {
     db.prepare(`
       UPDATE requests
-      SET destination = ?, purpose = ?, start_date = ?, end_date = ?, leave_type = ?, signature = ?, details_json = ?
+      SET status = ?, destination = ?, purpose = ?, start_date = ?, end_date = ?, leave_type = ?, signature = ?, details_json = ?
       WHERE id = ?
     `).run(
+      newStatus,
       newDestination,
       newPurpose,
       newStartDate,
@@ -1113,17 +1163,55 @@ app.put('/api/requests/:id', authenticate, (req, res) => {
       requestId
     );
 
-    db.prepare('INSERT INTO approvals (request_id, user_id, decision, note) VALUES (?, ?, ?, ?)').run(
-      requestId,
-      req.user.id,
-      'edit',
-      `Application updated by ${req.user.name} (${req.user.role}).`
-    );
+    if (isResubmitting) {
+      const notesSnippet = mergedDetails.correctionNotes ? ` Notes: "${mergedDetails.correctionNotes}"` : '';
+      db.prepare('INSERT INTO approvals (request_id, user_id, decision, note) VALUES (?, ?, ?, ?)').run(
+        requestId,
+        req.user.id,
+        'resubmit',
+        `Application resubmitted by ${req.user.name} after fixing shortcomings.${notesSnippet}`
+      );
+
+      // Notify Department Head
+      db.prepare(`
+        INSERT INTO notifications (user_id, role_target, request_id, title, message, type)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(
+        request.department_head_id || null,
+        'department_head',
+        requestId,
+        'Application Resubmitted (අඩුපාඩු සකසා නැවත යොමු කරන ලදී)',
+        `Application FV-${String(requestId).padStart(4, '0')} has been amended and resubmitted by ${req.user.name}.${notesSnippet}`,
+        'application_received'
+      );
+
+      // Notify Applicant
+      db.prepare(`
+        INSERT INTO notifications (user_id, role_target, request_id, title, message, type)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(
+        request.applicant_id,
+        null,
+        requestId,
+        'Application Resubmitted Successfully',
+        `Your application FV-${String(requestId).padStart(4, '0')} has been resubmitted and forwarded to Head of Department for review.`,
+        'success'
+      );
+    } else {
+      db.prepare('INSERT INTO approvals (request_id, user_id, decision, note) VALUES (?, ?, ?, ?)').run(
+        requestId,
+        req.user.id,
+        'edit',
+        `Application updated by ${req.user.name} (${req.user.role}).`
+      );
+    }
 
     const updated = db.prepare('SELECT * FROM requests WHERE id = ?').get(requestId);
     res.json({
       success: true,
-      message: `Request FV-${String(requestId).padStart(4, '0')} updated successfully.`,
+      message: isResubmitting
+        ? `Request FV-${String(requestId).padStart(4, '0')} resubmitted successfully for review.`
+        : `Request FV-${String(requestId).padStart(4, '0')} updated successfully.`,
       request: {
         ...updated,
         details: mergedDetails

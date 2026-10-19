@@ -642,6 +642,8 @@ export default function RequestModal({
 }) {
   const isEditing = Boolean(editingRequest);
   const editDetails = editingRequest?.details || {};
+  const isRejected = editingRequest?.status === 'Rejected' || Boolean(editDetails.rejectionRecord);
+  const [correctionNotes, setCorrectionNotes] = useState(editDetails.correctionNotes || '');
   const effectiveLeaveType = isEditing
     ? (editingRequest.leave_type === 'Official duty' || editDetails.leaveType === 'Official duty' ? 'official' : 'personal')
     : initialLeaveType;
@@ -864,12 +866,15 @@ export default function RequestModal({
         purpose: form.purpose,
         signature,
         signatureDataUrl: signature,
+        resubmit: isRejected,
+        correctionNotes: correctionNotes.trim(),
         details: {
           ...form,
           leaveType: isOfficial ? 'Official duty' : 'Private leave',
           signature,
           declarationConfirmed: declaration,
           daysApplied,
+          correctionNotes: correctionNotes.trim(),
         },
       };
 
@@ -912,9 +917,13 @@ export default function RequestModal({
             </div>
             <h2>
               {isEditing
-                ? (language === 'si'
-                    ? `අයදුම්පත සංස්කරණය · FV-${String(editingRequest.id).padStart(4, '0')}`
-                    : `Edit Application · FV-${String(editingRequest.id).padStart(4, '0')}`)
+                ? (isRejected
+                    ? (language === 'si'
+                        ? `අඩුපාඩු නිවැරදි කර නැවත ඉදිරිපත් කිරීම · FV-${String(editingRequest.id).padStart(4, '0')}`
+                        : `Fix Deficiencies & Resubmit · FV-${String(editingRequest.id).padStart(4, '0')}`)
+                    : (language === 'si'
+                        ? `අයදුම්පත සංස්කරණය · FV-${String(editingRequest.id).padStart(4, '0')}`
+                        : `Edit Application · FV-${String(editingRequest.id).padStart(4, '0')}`))
                 : (isOfficial
                     ? (step === 1 ? labels.gen126Title : labels.app16Title)
                     : (step === 1 ? labels.gen126Title : labels.docsHeading))}
@@ -986,6 +995,43 @@ export default function RequestModal({
 
         <form onSubmit={submit}>
           <div className="detailed-form-body">
+            {/* Rejection Deficiencies Callout Banner */}
+            {isRejected && (
+              <div style={{
+                background: '#fef2f2',
+                border: '1.5px solid #fca5a5',
+                borderRadius: '10px',
+                padding: '14px 18px',
+                marginBottom: '20px',
+                boxShadow: '0 2px 8px rgba(220, 38, 38, 0.05)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#b91c1c', fontWeight: 800, fontSize: '13.5px', marginBottom: '6px' }}>
+                  <AlertCircle size={17} />
+                  <span>{language === 'si' ? 'ප්‍රතික්ෂේප කිරීමට හේතුව සහ පවතින අඩුපාඩු (Rejection Deficiencies):' : 'Rejection Reason & Deficiencies to Address:'}</span>
+                </div>
+                <div style={{
+                  background: '#ffffff',
+                  border: '1px solid #fecaca',
+                  borderRadius: '6px',
+                  padding: '10px 14px',
+                  color: '#7f1d1d',
+                  fontSize: '13px',
+                  lineHeight: '1.5',
+                  fontWeight: 600
+                }}>
+                  "{editDetails.rejectionRecord?.reason || editingRequest?.rejection_reason || (language === 'si' ? 'අයදුම්පත අනුමත කර නැත. කරුණාකර අඩුපාඩු නිවැරදි කර නැවත ඉදිරිපත් කරන්න.' : 'Application was not approved. Please correct the shortcomings and resubmit.')}"
+                </div>
+                {editDetails.rejectionRecord?.rejectedBy && (
+                  <div style={{ fontSize: '11px', color: '#991b1b', marginTop: '6px' }}>
+                    {language === 'si' ? 'ප්‍රතික්ෂේප කළ නිලධාරී:' : 'Rejected by:'} <strong>{editDetails.rejectionRecord.rejectedBy.name}</strong> ({editDetails.rejectionRecord.rejectedBy.designation || editDetails.rejectionRecord.rejectedBy.role}) · {editDetails.rejectionRecord.date}
+                  </div>
+                )}
+                <div style={{ fontSize: '11.5px', color: '#15803d', marginTop: '8px', fontWeight: 600 }}>
+                  💡 {language === 'si' ? 'කරුණාකර ඉහත අඩුපාඩු නිවැරදි කර, අවශ්‍ය තොරතුරු සහ ලේඛන යාවත්කාලීන කර පහත "නැවත ඉදිරිපත් කරන්න" බොත්තම ඔබන්න.' : 'Please correct the deficiencies above, update any information and documents, and click "Resubmit Application" below.'}
+                </div>
+              </div>
+            )}
+
             {/* ========================================================================= */}
             {/* FLOW 1: GENERAL 126 (SHOWN WHEN STEP === 1 FOR BOTH LEAVE TYPES)          */}
             {/* ========================================================================= */}
@@ -1702,6 +1748,30 @@ export default function RequestModal({
               </>
             )}
 
+            {isRejected && step === 2 && (
+              <div style={{
+                marginTop: '16px',
+                background: '#f8fafc',
+                border: '1.5px solid #cbd5e1',
+                borderRadius: '10px',
+                padding: '14px 16px'
+              }}>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
+                  {language === 'si' ? '📝 කළ සංශෝධන පිළිබඳ කෙටි සටහනක් (Notes on Corrections Made):' : '📝 Notes on Corrections Made:'}
+                </label>
+                <textarea
+                  value={correctionNotes}
+                  onChange={(e) => setCorrectionNotes(e.target.value)}
+                  placeholder={language === 'si' ? 'උදා: ප්‍රතික්ෂේප කිරීමට හේතු වූ ලේඛන යාවත්කාලීන කරන ලද අතර අදාළ තොරතුරු සකසන ලදී...' : 'e.g., Attached the requested institutional clearance and updated travel details...'}
+                  rows={3}
+                  style={{ width: '100%', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '10px', fontSize: '12.5px', resize: 'vertical', boxSizing: 'border-box' }}
+                />
+                <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                  {language === 'si' ? 'මෙම සටහන අනුමත කරන නිලධාරීන්ට ඔබ කළ සංශෝධන ඉක්මනින් හඳුනා ගැනීමට උපකාරී වේ.' : 'This note helps approving officers quickly verify what deficiencies were resolved.'}
+                </span>
+              </div>
+            )}
+
             {error && (
               <div className="form-error">
                 <AlertCircle size={15} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
@@ -1747,7 +1817,7 @@ export default function RequestModal({
                   className="primary-button"
                   disabled={busy || !signature || !declaration}
                 >
-                  {busy ? '…' : (isEditing ? (language === 'si' ? 'වෙනස්කම් සුරකින්න' : 'Save Changes') : labels.submitOfficialBtn)}
+                  {busy ? '…' : (isEditing ? (isRejected ? (language === 'si' ? 'අඩුපාඩු සකසා නැවත ඉදිරිපත් කරන්න' : 'Resubmit Application with Corrections') : (language === 'si' ? 'වෙනස්කම් සුරකින්න' : 'Save Changes')) : labels.submitOfficialBtn)}
                   <Check size={15} />
                 </button>
               </>
@@ -1784,7 +1854,7 @@ export default function RequestModal({
                   className="primary-button"
                   disabled={busy}
                 >
-                  {busy ? '…' : (isEditing ? (language === 'si' ? 'වෙනස්කම් සුරකින්න' : 'Save Changes') : labels.submitPersonalBtn)}
+                  {busy ? '…' : (isEditing ? (isRejected ? (language === 'si' ? 'අඩුපාඩු සකසා නැවත ඉදිරිපත් කරන්න' : 'Resubmit Application with Corrections') : (language === 'si' ? 'වෙනස්කම් සුරකින්න' : 'Save Changes')) : labels.submitPersonalBtn)}
                   <Check size={15} />
                 </button>
               </>
@@ -2753,6 +2823,73 @@ export function ApplicantLiveProcessTracker({
         </div>
       </div>
 
+      {/* Rejection & Deficiencies Alert Card with Resubmit CTA */}
+      {info.isRejected && (
+        <div style={{
+          background: '#fef2f2',
+          border: '1.5px solid #f87171',
+          borderRadius: '10px',
+          padding: '16px 20px',
+          marginBottom: '16px',
+          boxShadow: '0 4px 12px rgba(220, 38, 38, 0.08)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '14px' }}>
+            <div style={{ flex: '1 1 320px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#b91c1c', fontWeight: 800, fontSize: '13.5px' }}>
+                <AlertCircle size={18} />
+                <span>{language === 'si' ? 'අයදුම්පත ප්‍රතික්ෂේප කර ඇත · අඩුපාඩු විස්තරය (Rejection Deficiencies):' : 'Application Rejected · Deficiencies / Shortcomings:'}</span>
+              </div>
+              <div style={{
+                marginTop: '8px',
+                background: '#ffffff',
+                border: '1px solid #fecaca',
+                borderRadius: '8px',
+                padding: '10px 14px',
+                color: '#7f1d1d',
+                fontSize: '13px',
+                lineHeight: '1.5',
+                fontWeight: 600
+              }}>
+                "{d.rejectionRecord?.reason || activeReq.rejection_reason || (language === 'si' ? 'විස්තර ලබා දී නොමැත.' : 'No rejection reason specified.')}"
+              </div>
+              {d.rejectionRecord?.rejectedBy && (
+                <div style={{ fontSize: '11px', color: '#991b1b', marginTop: '6px' }}>
+                  {language === 'si' ? 'ප්‍රතික්ෂේප කළ නිලධාරී:' : 'Rejected by:'} <strong>{d.rejectionRecord.rejectedBy.name}</strong> ({d.rejectionRecord.rejectedBy.designation || d.rejectionRecord.rejectedBy.role}) · {d.rejectionRecord.date}
+                </div>
+              )}
+              <div style={{ fontSize: '12px', color: '#047857', marginTop: '8px', fontWeight: 600 }}>
+                💡 {language === 'si' ? 'ඔබට ඉහත අඩුපාඩු නිවැරදි කර, අවශ්‍ය තොරතුරු සහ ලේඛන යාවත්කාලීන කර මෙම අයදුම්පත නැවත සමාලෝචනය සඳහා ඉදිරිපත් කළ හැක.' : 'You can correct the shortcomings mentioned above and resubmit this application for re-evaluation.'}
+              </div>
+            </div>
+
+            {(user?.role === 'admin' || user?.id === activeReq.applicant_id || user?.role === 'applicant') && onEditRequest && (
+              <button
+                type="button"
+                onClick={() => onEditRequest(activeReq)}
+                style={{
+                  background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                  color: '#ffffff',
+                  padding: '10px 18px',
+                  fontSize: '12.5px',
+                  fontWeight: 800,
+                  borderRadius: '8px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  border: 'none',
+                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+                  cursor: 'pointer',
+                  flexShrink: 0
+                }}
+              >
+                <Edit3 size={15} />
+                <span>{language === 'si' ? 'අඩුපාඩු හදලා නැවත ඉදිරිපත් කරන්න (Fix & Resubmit)' : 'Fix Shortcomings & Resubmit'}</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Current Stage Desk Box */}
       <div style={{
         background: info.bg,
@@ -2905,12 +3042,13 @@ export function ApplicantLiveProcessTracker({
           </button>
         )}
 
-        {/* Edit Button */}
-        {(user?.role === 'admin' || ((user?.id === activeReq.applicant_id || user?.role === 'applicant') && ['Pending Department Head Approval', 'Pending Review', 'Returned'].includes(activeReq.status))) && onEditRequest && (
+        {/* Edit / Resubmit Button */}
+        {(user?.role === 'admin' || ((user?.id === activeReq.applicant_id || user?.role === 'applicant') && ['Pending Department Head Approval', 'Pending Review', 'Returned', 'Rejected'].includes(activeReq.status))) && onEditRequest && (
           <button
             type="button"
             className="secondary-button"
             onClick={() => onEditRequest(activeReq)}
+            title={language === 'si' ? (activeReq.status === 'Rejected' ? 'අඩුපාඩු සකසා නැවත ඉදිරිපත් කරන්න' : 'අයදුම්පත සංස්කරණය කරන්න') : (activeReq.status === 'Rejected' ? 'Fix Deficiencies & Resubmit' : 'Edit Application')}
             style={{
               height: '30px',
               padding: '0 10px',
@@ -2918,19 +3056,19 @@ export function ApplicantLiveProcessTracker({
               display: 'inline-flex',
               alignItems: 'center',
               gap: '5px',
-              borderColor: '#93c5fd',
-              background: '#eff6ff',
-              color: '#1d4ed8',
-              fontWeight: 600
+              borderColor: activeReq.status === 'Rejected' ? '#f87171' : '#93c5fd',
+              background: activeReq.status === 'Rejected' ? '#fef2f2' : '#eff6ff',
+              color: activeReq.status === 'Rejected' ? '#b91c1c' : '#1d4ed8',
+              fontWeight: 700
             }}
           >
             <Edit3 size={13} />
-            <span>{language === 'si' ? 'සංස්කරණය (Edit)' : 'Edit'}</span>
+            <span>{language === 'si' ? (activeReq.status === 'Rejected' ? 'අඩුපාඩු හදන්න (Fix & Resubmit)' : 'සංස්කරණය (Edit)') : (activeReq.status === 'Rejected' ? 'Fix & Resubmit' : 'Edit')}</span>
           </button>
         )}
 
         {/* Delete Button */}
-        {(user?.role === 'admin' || ((user?.id === activeReq.applicant_id || user?.role === 'applicant') && ['Pending Department Head Approval', 'Pending Review', 'Returned'].includes(activeReq.status))) && onDeleteRequest && (
+        {(user?.role === 'admin' || ((user?.id === activeReq.applicant_id || user?.role === 'applicant') && ['Pending Department Head Approval', 'Pending Review', 'Returned', 'Rejected'].includes(activeReq.status))) && onDeleteRequest && (
           <button
             type="button"
             className="secondary-button"
@@ -2949,7 +3087,7 @@ export function ApplicantLiveProcessTracker({
             }}
           >
             <Trash2 size={13} />
-            <span>{language === 'si' ? 'මකා දමන්න (Delete)' : 'Delete'}</span>
+            <span>{language === 'si' ? 'මකා දමන්න' : 'Delete'}</span>
           </button>
         )}
 
@@ -3457,6 +3595,33 @@ export function RequestDetails({ details = {}, language, request, onPrintOfficer
   return (
     <div className="request-review-details">
       <WorkflowHierarchyStepper request={request || { details }} language={language} />
+
+      {/* Resubmission & Corrections History Banner */}
+      {(details.isResubmitted || details.resubmissionRecord || (details.rejectionHistory && details.rejectionHistory.length > 0)) && (
+        <div style={{
+          background: '#f0fdf4',
+          border: '1.5px solid #86efac',
+          borderRadius: '8px',
+          padding: '12px 16px',
+          marginBottom: '16px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#166534', fontWeight: 800, fontSize: '13px', marginBottom: '4px' }}>
+            <span>🔁</span>
+            <span>{language === 'si' ? 'අඩුපාඩු නිවැරදි කර නැවත ඉදිරිපත් කරන ලද අයදුම්පතකි (Resubmitted Application)' : 'Resubmitted Application (Amended after Deficiencies)'}</span>
+          </div>
+          {(details.correctionNotes || details.resubmissionRecord?.correctionNotes) && (
+            <div style={{ fontSize: '12.5px', color: '#14532d', marginTop: '4px', lineHeight: 1.4 }}>
+              <strong>{language === 'si' ? 'කළ සංශෝධන සටහන:' : 'Correction Notes:'}</strong> {details.correctionNotes || details.resubmissionRecord?.correctionNotes}
+            </div>
+          )}
+          {details.rejectionHistory && details.rejectionHistory.length > 0 && (
+            <div style={{ fontSize: '11px', color: '#65a30d', marginTop: '6px' }}>
+              <strong>{language === 'si' ? 'පෙර ප්‍රතික්ෂේප කළ හේතුව:' : 'Previous Deficiencies:'}</strong> "{details.rejectionHistory[details.rejectionHistory.length - 1].reason}"
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
         <span className={`modal-leave-tag ${isOfficial ? 'official' : 'personal'}`}>
           {isOfficial
