@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 
 export default function ProfileSection({ user, onProfileUpdated, token, language = 'en', showToast }) {
+  const [salutation, setSalutation] = useState(user?.salutation || 'Mr.');
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
   const [designation, setDesignation] = useState(user?.designation || '');
@@ -48,6 +49,7 @@ export default function ProfileSection({ user, onProfileUpdated, token, language
       .then((res) => res.json())
       .then((data) => {
         if (data && !data.error) {
+          if (data.salutation) setSalutation(data.salutation);
           if (data.name) setName(data.name);
           if (data.email) setEmail(data.email);
           if (data.designation) setDesignation(data.designation);
@@ -109,6 +111,7 @@ export default function ProfileSection({ user, onProfileUpdated, token, language
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
+          salutation: salutation || 'Mr.',
           name: name.trim(),
           email: email.trim(),
           designation: designation.trim(),
@@ -133,7 +136,6 @@ export default function ProfileSection({ user, onProfileUpdated, token, language
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setIsEditingSignature(false);
 
       if (onProfileUpdated) {
         onProfileUpdated(data.user, data.token);
@@ -206,7 +208,7 @@ export default function ProfileSection({ user, onProfileUpdated, token, language
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 800 }}>{name || user?.name}</h2>
+              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 800 }}>{salutation ? `${salutation} ` : ''}{name || user?.name}</h2>
               <span style={{
                 background: 'rgba(255, 255, 255, 0.2)',
                 border: '1px solid rgba(255, 255, 255, 0.35)',
@@ -300,19 +302,35 @@ export default function ProfileSection({ user, onProfileUpdated, token, language
             </h3>
 
             <div style={{ display: 'grid', gap: '14px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
-                  {language === 'si' ? 'සම්පූර්ණ නම (Full Name) *' : 'Full Name *'}
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Nimal Perera"
-                    style={{ width: '100%', height: '38px', padding: '0 12px', fontSize: '12.5px', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
-                  />
+              <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
+                    {language === 'si' ? 'ගෞරව නාමය *' : 'Title *'}
+                  </label>
+                  <select
+                    value={salutation}
+                    onChange={(e) => setSalutation(e.target.value)}
+                    style={{ width: '100%', height: '38px', padding: '0 8px', fontSize: '12.5px', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box', background: '#fff' }}
+                  >
+                    <option value="Mr.">{language === 'si' ? 'Mr. (මයා)' : 'Mr.'}</option>
+                    <option value="Mrs.">{language === 'si' ? 'Mrs. (මිය)' : 'Mrs.'}</option>
+                    <option value="Miss">{language === 'si' ? 'Miss (මෙනවිය)' : 'Miss'}</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
+                    {language === 'si' ? 'සම්පූර්ණ නම (Full Name) *' : 'Full Name *'}
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. Nimal Perera"
+                      style={{ width: '100%', height: '38px', padding: '0 12px', fontSize: '12.5px', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                    />
+                  </div>
                 </div>
               </div>
 

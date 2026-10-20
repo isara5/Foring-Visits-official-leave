@@ -407,6 +407,7 @@ function App() {
   const [typeFilter, setTypeFilter] = useState('all');
 
   // Add User form state (Admin only)
+  const [newUserSalutation, setNewUserSalutation] = useState('Mr.');
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserRole, setNewUserRole] = useState('applicant');
@@ -605,6 +606,7 @@ function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
+          salutation: newUserSalutation,
           name: newUserName,
           email: newUserEmail,
           role: newUserRole,
@@ -614,6 +616,7 @@ function App() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to create user');
+      setNewUserSalutation('Mr.');
       setNewUserName('');
       setNewUserEmail('');
       setNewUserPassword('Demo@123');
@@ -829,6 +832,13 @@ function App() {
     } : null);
     const presidentialDecision = d.presidentialDecision || (d.secretariatClearances && d.secretariatClearances.find(c => c.role === 'president'));
 
+    const deptEndorsement = d.departmentHeadEndorsement || {};
+    const activeSalutation = (deptEndorsement.officerSalutation && deptEndorsement.officerSalutation !== 'Mr./Mrs./Miss')
+      ? deptEndorsement.officerSalutation
+      : (r.applicant_salutation || d.salutation || 'Mr.');
+    const sinhalaHonorificPossessive = activeSalutation === 'Mrs.' ? 'මහත්මියගේ' : (activeSalutation === 'Miss' ? 'මෙනවියගේ' : 'මහතාගේ');
+    const tamilSalutation = activeSalutation === 'Mrs.' ? 'திருமதி' : (activeSalutation === 'Miss' ? 'செல்வி' : 'திரு.');
+
     printWin.document.write(`
       <!DOCTYPE html>
       <html>
@@ -869,7 +879,7 @@ function App() {
           </div>
           <div class="sec-title">1. Officer and Service Particulars (General 126)</div>
           <div class="grid">
-            <div class="item"><span>Full Name</span><strong>${r.applicant_name}</strong></div>
+            <div class="item"><span>Full Name</span><strong>${activeSalutation} ${r.applicant_name}</strong></div>
             <div class="item"><span>Department / Institution</span><strong>${d.department || r.department_name || '—'}</strong></div>
             <div class="item"><span>Post / Designation</span><strong>${d.designation || '—'}</strong></div>
             <div class="item"><span>Service & Grade</span><strong>${d.service || '—'} ${d.grade ? '(' + d.grade + ')' : ''}</strong></div>
@@ -945,13 +955,13 @@ function App() {
               <!-- Clause 1 -->
               <div style="margin-bottom: 16px; font-size: 11px; line-height: 1.5;">
                 <p style="margin: 0 0 6px;">
-                  1. <span style="border-bottom: 1px dotted #000; font-weight: bold; padding: 0 8px;">${r.applicant_name}</span> මහතාගේ/මහත්මියගේ/මෙනෙවියගේ නිවාඩු ඉල්ලුම් පත්‍රයේ පිටපත් දෙකක් මේ සමග ඉදිරිපත් කරමි. මේ නිලධාරියාගේ/නිලධාරිනියගේ වැඩ බැලීම සඳහා වැඩ පිළිවෙලක් යොදා ඇති බවත්, ඔහුට/ඇයට විරුද්ධව විනයානුකූල ක්‍රියා මාර්ගයක් දැනට පවත්වන්නේවත්, එසේ විනයානුකූල ක්‍රියා මාර්ගයක් ගැනීමට අදහස් කර ඇත්තේවත් නැති බව සහතික කරමි.
+                  1. <span style="border-bottom: 1px dotted #000; font-weight: bold; padding: 0 8px;">${r.applicant_name}</span> ${sinhalaHonorificPossessive} නිවාඩු ඉල්ලුම් පත්‍රයේ පිටපත් දෙකක් මේ සමග ඉදිරිපත් කරමි. මේ නිලධාරියාගේ/නිලධාරිනියගේ වැඩ බැලීම සඳහා වැඩ පිළිවෙලක් යොදා ඇති බවත්, ඔහුට/ඇයට විරුද්ධව විනයානුකූල ක්‍රියා මාර්ගයක් දැනට පවත්වන්නේවත්, එසේ විනයානුකූල ක්‍රියා මාර්ගයක් ගැනීමට අදහස් කර ඇත්තේවත් නැති බව සහතික කරමි.
                 </p>
                 <p style="margin: 0 0 6px; color: #475569; font-size: 10px;">
-                  திரு./திருமதி/செல்வி <span style="border-bottom: 1px dotted #000; padding: 0 6px;">${r.applicant_name}</span> அவர்களின் விடுதலை விண்ணப்பத்தில் இரண்டு பிரதிகளை இத்துடன் அனுப்புகிறேன். இவ் உத்தியோகத்தரின் கடமைகளையாற்றுவதற்குப் பதில் ஒழுங்குகள் செய்யப்பட்டுள்ளனவெனவும் இவருக்கெதிராக ஒழுக்காற்று நடவடிக்கை எதுவும் முடிவுசெய்யப்படாமலிருக்கவில்லை அல்லது ஒழுக்காற்று நடவடிக்கையெதுவும் எடுக்க உத்தேசிக்கப்பட்டிருக்கவில்லை எனவும் இத்தால் உறுதிப்படுத்துகிறேன்.
+                  ${tamilSalutation} <span style="border-bottom: 1px dotted #000; padding: 0 6px;">${r.applicant_name}</span> அவர்களின் விடுதலை விண்ணப்பத்தில் இரண்டு பிரதிகளை இத்துடன் அனுப்புகிறேன். இவ் உத்தியோகத்தரின் கடமைகளையாற்றுவதற்குப் பதில் ஒழுங்குகள் செய்யப்பட்டுள்ளனவெனவும் இவருக்கெதிராக ஒழுக்காற்று நடவடிக்கை எதுவும் முடிவுசெய்யப்படாமலிருக்கவில்லை அல்லது ஒழுக்காற்று நடவடிக்கையெதுவும் எடுக்க உத்தேசிக்கப்பட்டிருக்கவில்லை எனவும் இத்தால் உறுதிப்படுத்துகிறேன்.
                 </p>
                 <p style="margin: 0; font-size: 10px;">
-                  I forward herewith two copies of the leave application of Mr./Mrs./Miss <span style="border-bottom: 1px dotted #000; font-weight: bold; padding: 0 6px;">${r.applicant_name}</span>.<br>
+                  I forward herewith two copies of the leave application of ${activeSalutation} <span style="border-bottom: 1px dotted #000; font-weight: bold; padding: 0 6px;">${r.applicant_name}</span>.<br>
                   I certify that acting arrangements have been made and that there is no disciplinary action pending or contemplated against this officer.
                 </p>
               </div>
@@ -2368,16 +2378,29 @@ function App() {
                   <p className="panel-desc">{t.addNewUserDesc}</p>
 
                   <form className="user-form" onSubmit={handleAddUser}>
-                    <label className="field-label">
-                      {t.fullName} *
-                      <input
-                        type="text"
-                        required
-                        value={newUserName}
-                        onChange={(e) => setNewUserName(e.target.value)}
-                        placeholder="e.g. Priyantha Jayawardena"
-                      />
-                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '10px' }}>
+                      <label className="field-label">
+                        {language === 'si' ? 'ගෞරව නාමය' : 'Title'} *
+                        <select
+                          value={newUserSalutation}
+                          onChange={(e) => setNewUserSalutation(e.target.value)}
+                        >
+                          <option value="Mr.">{language === 'si' ? 'Mr. (මයා)' : 'Mr.'}</option>
+                          <option value="Mrs.">{language === 'si' ? 'Mrs. (මිය)' : 'Mrs.'}</option>
+                          <option value="Miss">{language === 'si' ? 'Miss (මෙනවිය)' : 'Miss'}</option>
+                        </select>
+                      </label>
+                      <label className="field-label">
+                        {t.fullName} *
+                        <input
+                          type="text"
+                          required
+                          value={newUserName}
+                          onChange={(e) => setNewUserName(e.target.value)}
+                          placeholder="e.g. Priyantha Jayawardena"
+                        />
+                      </label>
+                    </div>
 
                     <label className="field-label">
                       {t.officialEmail} *
@@ -2539,7 +2562,7 @@ function App() {
                                 <span className="mini-avatar">
                                   {u.name.split(' ').map((p) => p[0]).slice(0, 2).join('')}
                                 </span>
-                                <strong>{u.name}</strong>
+                                <strong>{u.salutation ? `${u.salutation} ` : ''}{u.name}</strong>
                               </div>
                             </td>
                             <td>{u.email}</td>
@@ -2999,6 +3022,7 @@ function AuthPage({ language, setLanguage, t, onLogin }) {
   const [showSignInPassword, setShowSignInPassword] = useState(false);
 
   // Registration state (Applicant only)
+  const [regSalutation, setRegSalutation] = useState('Mr.');
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
@@ -3042,6 +3066,7 @@ function AuthPage({ language, setLanguage, t, onLogin }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          salutation: regSalutation,
           name: regName,
           email: regEmail,
           password: regPassword
@@ -3212,16 +3237,30 @@ function AuthPage({ language, setLanguage, t, onLogin }) {
               </div>
 
               <form onSubmit={handleRegister}>
-                <label className="field-label">
-                  {t.fullName} *
-                  <input
-                    type="text"
-                    required
-                    value={regName}
-                    onChange={(e) => setRegName(e.target.value)}
-                    placeholder="e.g. Priyantha Jayawardena"
-                  />
-                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '10px' }}>
+                  <label className="field-label">
+                    {language === 'si' ? 'ගෞරව නාමය' : 'Title'} *
+                    <select
+                      value={regSalutation}
+                      onChange={(e) => setRegSalutation(e.target.value)}
+                      style={{ height: '38px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 8px', fontSize: '13px', background: '#fff' }}
+                    >
+                      <option value="Mr.">{language === 'si' ? 'Mr. (මයා)' : 'Mr.'}</option>
+                      <option value="Mrs.">{language === 'si' ? 'Mrs. (මිය)' : 'Mrs.'}</option>
+                      <option value="Miss">{language === 'si' ? 'Miss (මෙනවිය)' : 'Miss'}</option>
+                    </select>
+                  </label>
+                  <label className="field-label">
+                    {t.fullName} *
+                    <input
+                      type="text"
+                      required
+                      value={regName}
+                      onChange={(e) => setRegName(e.target.value)}
+                      placeholder="e.g. Priyantha Jayawardena"
+                    />
+                  </label>
+                </div>
 
                 <label className="field-label">
                   {t.email} *

@@ -98,6 +98,13 @@ if (!userColumns.includes('phone')) {
 if (!userColumns.includes('signature')) {
   db.exec('ALTER TABLE users ADD COLUMN signature TEXT');
 }
+if (!userColumns.includes('salutation')) {
+  db.exec("ALTER TABLE users ADD COLUMN salutation TEXT DEFAULT 'Mr.'");
+}
+try {
+  db.exec("UPDATE users SET salutation = 'Mrs.' WHERE lower(name) LIKE 'mrs.%' AND (salutation IS NULL OR salutation = 'Mr.')");
+  db.exec("UPDATE users SET salutation = 'Miss' WHERE lower(name) LIKE 'miss%' AND (salutation IS NULL OR salutation = 'Mr.')");
+} catch {}
 
 const MINISTERIAL_RANKS = {
   reviewer: 0,
@@ -130,19 +137,19 @@ const ROLE_TO_STATUS = {
 };
 
 const seededUsers = [
-  ['Portal Administrator', 'admin@foring.gov.lk', 'admin', 'Admin@123', 'System Administrator'],
-  ['Nimal Perera', 'officer@foring.gov.lk', 'applicant', 'Demo@123', 'Staff Officer'],
-  ['Senior Reviewing Officer', 'reviewer@foring.gov.lk', 'reviewer', 'Demo@123', 'Subject Officer (Leave & Establishments)'],
-  ['Mrs. D. M. K. Dissanayake', 'asst.sec@foring.gov.lk', 'assistant_secretary', 'Demo@123', 'Assistant Secretary (Administration)'],
-  ['Mr. W. A. Wickramasinghe', 'senior.asst.sec@foring.gov.lk', 'senior_assistant_secretary', 'Demo@123', 'Senior Assistant Secretary (Public Administration)'],
-  ['Dr. K. T. Rajakaruna', 'addl.sec@foring.gov.lk', 'additional_secretary', 'Demo@123', 'Additional Secretary (HR & Establishments)'],
-  ['වරුෂණ ශ්‍රී ධනපාල (Varushana Sri Dhanapala)', 'secretary@foring.gov.lk', 'secretary', 'Demo@123', 'ලේකම් (Secretary), සිවිල් ආරක්ෂක අමාත්‍යාංශය'],
-  ['Director General (Authorized Official)', 'authorized@foring.gov.lk', 'authorized_official', 'Demo@123', 'Director General (Authorized Official)'],
-  ['Hon. Minister of Public Administration', 'minister@foring.gov.lk', 'minister', 'Demo@123', 'Cabinet Minister'],
-  ['අතිගරු ජනාධිපතිතුමා (President)', 'president@foring.gov.lk', 'president', 'Demo@123', 'ජනාධිපති සහ ඩිජිටල් ආර්ථික අමාත්‍යාංශය'],
+  ['Portal Administrator', 'admin@foring.gov.lk', 'admin', 'Admin@123', 'System Administrator', 'Mr.'],
+  ['Nimal Perera', 'officer@foring.gov.lk', 'applicant', 'Demo@123', 'Staff Officer', 'Mr.'],
+  ['Senior Reviewing Officer', 'reviewer@foring.gov.lk', 'reviewer', 'Demo@123', 'Subject Officer (Leave & Establishments)', 'Mr.'],
+  ['Mrs. D. M. K. Dissanayake', 'asst.sec@foring.gov.lk', 'assistant_secretary', 'Demo@123', 'Assistant Secretary (Administration)', 'Mrs.'],
+  ['Mr. W. A. Wickramasinghe', 'senior.asst.sec@foring.gov.lk', 'senior_assistant_secretary', 'Demo@123', 'Senior Assistant Secretary (Public Administration)', 'Mr.'],
+  ['Dr. K. T. Rajakaruna', 'addl.sec@foring.gov.lk', 'additional_secretary', 'Demo@123', 'Additional Secretary (HR & Establishments)', 'Mr.'],
+  ['වරුෂණ ශ්‍රී ධනපාල (Varushana Sri Dhanapala)', 'secretary@foring.gov.lk', 'secretary', 'Demo@123', 'ලේකම් (Secretary), සිවිල් ආරක්ෂක අමාත්‍යාංශය', 'Mr.'],
+  ['Director General (Authorized Official)', 'authorized@foring.gov.lk', 'authorized_official', 'Demo@123', 'Director General (Authorized Official)', 'Mr.'],
+  ['Hon. Minister of Public Administration', 'minister@foring.gov.lk', 'minister', 'Demo@123', 'Cabinet Minister', 'Mr.'],
+  ['අතිගරු ජනාධිපතිතුමා (President)', 'president@foring.gov.lk', 'president', 'Demo@123', 'ජනාධිපති සහ ඩිජිටල් ආර්ථික අමාත්‍යාංශය', 'Mr.'],
 ];
-const addUser = db.prepare('INSERT INTO users (name, email, role, password_hash, designation) VALUES (?, ?, ?, ?, ?) ON CONFLICT(email) DO UPDATE SET role=excluded.role, name=excluded.name, password_hash=excluded.password_hash, designation=excluded.designation');
-for (const [name, email, role, password, designation] of seededUsers) addUser.run(name, email, role, bcrypt.hashSync(password, 10), designation);
+const addUser = db.prepare('INSERT INTO users (name, email, role, password_hash, designation, salutation) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(email) DO UPDATE SET role=excluded.role, name=excluded.name, password_hash=excluded.password_hash, designation=excluded.designation, salutation=COALESCE(users.salutation, excluded.salutation)');
+for (const [name, email, role, password, designation, salutation] of seededUsers) addUser.run(name, email, role, bcrypt.hashSync(password, 10), designation, salutation);
 
 // 9 Official Departments registered by Admin with dedicated Department Head accounts
 const initialDepartments = [
@@ -272,8 +279,47 @@ function authenticate(req, res, next) {
   }
 }
 
+function findDepartmentHeadId(departmentId, departmentName) {
+  if (departmentId) {
+    const dept = db.prepare('SELECT head_user_id FROM departments WHERE id = ?').get(departmentId);
+    if (dept?.head_user_id) return dept.head_user_id;
+    const user = db.prepare('SELECT id FROM users WHERE role = "department_head" AND department_id = ? LIMIT 1').get(departmentId);
+    if (user?.id) return user.id;
+  }
+  if (departmentName && typeof departmentName === 'string') {
+    const cleanName = departmentName.trim().toLowerCase();
+    const dept = db.prepare('SELECT head_user_id FROM departments WHERE lower(name) = ? OR lower(name) LIKE ? LIMIT 1').get(cleanName, '%' + cleanName + '%');
+    if (dept?.head_user_id) return dept.head_user_id;
+    const user = db.prepare('SELECT id FROM users WHERE role = "department_head" AND (lower(department_name) = ? OR lower(department_name) LIKE ?) LIMIT 1').get(cleanName, '%' + cleanName + '%');
+    if (user?.id) return user.id;
+  }
+  return null;
+}
+
+function sendNotification({ userIds = [], roleTarget = null, requestId = null, title, message, type = 'info' }) {
+  const insert = db.prepare(`
+    INSERT INTO notifications (user_id, role_target, request_id, title, message, type)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  const uniqueUserIds = [...new Set(userIds.filter(Boolean))];
+  if (uniqueUserIds.length > 0) {
+    for (const uid of uniqueUserIds) {
+      insert.run(uid, null, requestId, title, message, type);
+    }
+  } else if (roleTarget) {
+    const users = db.prepare('SELECT id FROM users WHERE role = ?').all(roleTarget);
+    if (users.length > 0) {
+      for (const u of users) {
+        insert.run(u.id, null, requestId, title, message, type);
+      }
+    } else {
+      insert.run(null, roleTarget, requestId, title, message, type);
+    }
+  }
+}
+
 app.post('/api/auth/register', (req, res) => {
-  const { name, email, password } = req.body || {};
+  const { name, email, password, salutation } = req.body || {};
   if (!name?.trim() || !email?.trim() || !password?.trim()) {
     return res.status(400).json({ error: 'Full name, email, and password are required.' });
   }
@@ -282,14 +328,16 @@ app.post('/api/auth/register', (req, res) => {
   if (existing) {
     return res.status(400).json({ error: 'An account with this email already exists. Please sign in.' });
   }
+  const cleanSalutation = ['Mr.', 'Mrs.', 'Miss'].includes(salutation) ? salutation : 'Mr.';
   const hash = bcrypt.hashSync(password, 10);
-  const result = db.prepare('INSERT INTO users (name, email, role, password_hash) VALUES (?, ?, ?, ?)').run(
+  const result = db.prepare('INSERT INTO users (name, email, role, password_hash, salutation) VALUES (?, ?, ?, ?, ?)').run(
     name.trim(),
     cleanEmail,
     'applicant',
-    hash
+    hash,
+    cleanSalutation
   );
-  const profile = { id: Number(result.lastInsertRowid), name: name.trim(), email: cleanEmail, role: 'applicant' };
+  const profile = { id: Number(result.lastInsertRowid), name: name.trim(), email: cleanEmail, role: 'applicant', salutation: cleanSalutation };
   res.status(201).json({ token: jwt.sign(profile, secret, { expiresIn: '8h' }), user: profile });
 });
 
@@ -298,7 +346,7 @@ app.post('/api/auth/login', (req, res) => {
   if (!email || !password) {
     return res.status(400).json({ error: 'Please provide both your official email and password.' });
   }
-  const user = db.prepare('SELECT id, name, email, role, password_hash, department_id, department_name, designation FROM users WHERE lower(email) = lower(?)').get(email.trim());
+  const user = db.prepare('SELECT id, name, email, role, password_hash, department_id, department_name, designation, phone, signature, salutation FROM users WHERE lower(email) = lower(?)').get(email.trim());
   if (!user || !bcrypt.compareSync(password || '', user.password_hash)) {
     return res.status(401).json({ error: 'Email or password is incorrect.' });
   }
@@ -307,6 +355,7 @@ app.post('/api/auth/login', (req, res) => {
     name: user.name,
     email: user.email,
     role: user.role,
+    salutation: user.salutation || 'Mr.',
     department_id: user.department_id || null,
     department_name: user.department_name || null,
     designation: user.designation || null,
@@ -320,13 +369,13 @@ app.post('/api/auth/login', (req, res) => {
 // USER PROFILE MANAGEMENT (VIEW & UPDATE)
 // =========================================================================
 app.get('/api/profile', authenticate, (req, res) => {
-  const user = db.prepare('SELECT id, name, email, role, department_id, department_name, designation, phone, signature FROM users WHERE id = ?').get(req.user.id);
+  const user = db.prepare('SELECT id, name, email, role, department_id, department_name, designation, phone, signature, salutation FROM users WHERE id = ?').get(req.user.id);
   if (!user) return res.status(404).json({ error: 'User profile not found.' });
   res.json(user);
 });
 
 app.put('/api/profile', authenticate, (req, res) => {
-  const { name, email, designation, department_name, phone, signature, currentPassword, newPassword } = req.body || {};
+  const { name, email, designation, department_name, phone, signature, salutation, currentPassword, newPassword } = req.body || {};
   if (!name || !name.trim()) {
     return res.status(400).json({ error: 'Name cannot be empty.' });
   }
@@ -335,6 +384,8 @@ app.put('/api/profile', authenticate, (req, res) => {
   if (existing) {
     return res.status(400).json({ error: 'A user with this email address already exists.' });
   }
+
+  const cleanSalutation = ['Mr.', 'Mrs.', 'Miss'].includes(salutation) ? salutation : (req.user.salutation || 'Mr.');
 
   let passwordHash = null;
   if (newPassword && newPassword.trim()) {
@@ -354,18 +405,18 @@ app.put('/api/profile', authenticate, (req, res) => {
   if (passwordHash) {
     db.prepare(`
       UPDATE users 
-      SET name = ?, email = ?, designation = ?, department_name = ?, phone = ?, signature = ?, password_hash = ?
+      SET name = ?, email = ?, designation = ?, department_name = ?, phone = ?, signature = ?, salutation = ?, password_hash = ?
       WHERE id = ?
-    `).run(name.trim(), cleanEmail, designation?.trim() || null, department_name?.trim() || null, phone?.trim() || null, signature || null, passwordHash, req.user.id);
+    `).run(name.trim(), cleanEmail, designation?.trim() || null, department_name?.trim() || null, phone?.trim() || null, signature || null, cleanSalutation, passwordHash, req.user.id);
   } else {
     db.prepare(`
       UPDATE users 
-      SET name = ?, email = ?, designation = ?, department_name = ?, phone = ?, signature = ?
+      SET name = ?, email = ?, designation = ?, department_name = ?, phone = ?, signature = ?, salutation = ?
       WHERE id = ?
-    `).run(name.trim(), cleanEmail, designation?.trim() || null, department_name?.trim() || null, phone?.trim() || null, signature || null, req.user.id);
+    `).run(name.trim(), cleanEmail, designation?.trim() || null, department_name?.trim() || null, phone?.trim() || null, signature || null, cleanSalutation, req.user.id);
   }
 
-  const updated = db.prepare('SELECT id, name, email, role, department_id, department_name, designation, phone, signature FROM users WHERE id = ?').get(req.user.id);
+  const updated = db.prepare('SELECT id, name, email, role, department_id, department_name, designation, phone, signature, salutation FROM users WHERE id = ?').get(req.user.id);
   const token = jwt.sign(updated, secret, { expiresIn: '8h' });
   res.json({ success: true, user: updated, token });
 });
@@ -374,7 +425,7 @@ app.get('/api/requests', authenticate, (req, res) => {
   let rows;
   if (req.user.role === 'department_head') {
     rows = db.prepare(`
-      SELECT r.*, u.name AS applicant_name, u.email AS applicant_email,
+      SELECT r.*, u.name AS applicant_name, u.email AS applicant_email, u.salutation AS applicant_salutation,
         CASE WHEN rv.viewed_at IS NOT NULL THEN 1 ELSE 0 END AS is_viewed
       FROM requests r
       JOIN users u ON u.id = r.applicant_id
@@ -384,7 +435,7 @@ app.get('/api/requests', authenticate, (req, res) => {
     `).all(req.user.id, req.user.department_id || 0, req.user.id, req.user.id, req.user.department_name || '');
   } else {
     rows = db.prepare(`
-      SELECT r.*, u.name AS applicant_name, u.email AS applicant_email,
+      SELECT r.*, u.name AS applicant_name, u.email AS applicant_email, u.salutation AS applicant_salutation,
         CASE WHEN rv.viewed_at IS NOT NULL THEN 1 ELSE 0 END AS is_viewed
       FROM requests r
       JOIN users u ON u.id = r.applicant_id
@@ -411,7 +462,7 @@ app.get('/api/requests/:id', authenticate, (req, res) => {
   let row;
   if (req.user.role === 'department_head') {
     row = db.prepare(`
-      SELECT r.*, u.name AS applicant_name, u.email AS applicant_email,
+      SELECT r.*, u.name AS applicant_name, u.email AS applicant_email, u.salutation AS applicant_salutation,
         CASE WHEN rv.viewed_at IS NOT NULL THEN 1 ELSE 0 END AS is_viewed
       FROM requests r
       JOIN users u ON u.id = r.applicant_id
@@ -420,7 +471,7 @@ app.get('/api/requests/:id', authenticate, (req, res) => {
     `).get(req.user.id, requestId, req.user.department_id || 0, req.user.id, req.user.id, req.user.department_name || '');
   } else {
     row = db.prepare(`
-      SELECT r.*, u.name AS applicant_name, u.email AS applicant_email,
+      SELECT r.*, u.name AS applicant_name, u.email AS applicant_email, u.salutation AS applicant_salutation,
         CASE WHEN rv.viewed_at IS NOT NULL THEN 1 ELSE 0 END AS is_viewed
       FROM requests r
       JOIN users u ON u.id = r.applicant_id
@@ -451,7 +502,7 @@ app.post('/api/requests/:id/view', authenticate, (req, res) => {
 
   db.prepare(`
     UPDATE notifications SET is_read = 1
-    WHERE request_id = ? AND (user_id = ? OR role_target = ? OR role_target = 'all')
+    WHERE request_id = ? AND (user_id = ? OR (user_id IS NULL AND role_target = ?))
   `).run(requestId, req.user.id, req.user.role);
 
   res.json({ success: true, is_viewed: true });
@@ -492,8 +543,12 @@ app.post('/api/requests', authenticate, (req, res) => {
   // Correct Flow Step 1: Submits directly to Department Head!
   const initialStatus = 'Pending Department Head Approval';
 
+  const userSalutation = req.user.salutation || 'Mr.';
+  const detailsSalutation = ['Mr.', 'Mrs.', 'Miss'].includes(details.salutation) ? details.salutation : userSalutation;
+
   const updatedDetails = {
     ...details,
+    salutation: detailsSalutation,
     forwardedDepartment: dept ? {
       id: dept.id,
       name: dept.name,
@@ -523,28 +578,28 @@ app.post('/api/requests', authenticate, (req, res) => {
   // Automatically mark as viewed by applicant who created it
   db.prepare(`INSERT INTO request_views (user_id, request_id, viewed_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(user_id, request_id) DO NOTHING`).run(req.user.id, newRequestId);
 
-  // Send notifications to Department Head first
+  // Send notifications strictly between the applicant and their specific Department Head
   const applicantName = details.fullName?.trim() || req.user.name;
-  const insertNotification = db.prepare(`
-    INSERT INTO notifications (user_id, role_target, request_id, title, message, type)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
+  const targetDeptHeadId = departmentHeadId || findDepartmentHeadId(departmentId, departmentName);
 
-  if (departmentHeadId) {
-    insertNotification.run(
-      departmentHeadId,
-      'department_head',
-      newRequestId,
-      'New Leave Application For Institutional Endorsement',
-      `${applicantName} from your department submitted a ${leaveType} application (FV-${String(newRequestId).padStart(4, '0')}) for your institutional review & endorsement (Est. Code XV 10:1).`,
-      'action_required'
-    );
-  } else {
-    insertNotification.run(null, 'department_head', newRequestId, 'New Application Received', `${applicantName} submitted a ${leaveType} application (FV-${String(newRequestId).padStart(4, '0')}).`, 'action_required');
+  if (targetDeptHeadId) {
+    sendNotification({
+      userIds: [targetDeptHeadId],
+      requestId: newRequestId,
+      title: 'New Leave Application For Institutional Endorsement',
+      message: `${applicantName} from your department submitted a ${leaveType} application (FV-${String(newRequestId).padStart(4, '0')}) for your institutional review & endorsement (Est. Code XV 10:1).`,
+      type: 'action_required'
+    });
   }
 
-  insertNotification.run(null, 'admin', newRequestId, 'New Application Registered', `Leave application FV-${String(newRequestId).padStart(4, '0')} submitted by ${applicantName} to ${departmentName}.`, 'application_received');
-  insertNotification.run(req.user.id, null, newRequestId, 'Application Submitted Successfully', `Your application FV-${String(newRequestId).padStart(4, '0')} was submitted to your Head of Department (${departmentName}) for endorsement.`, 'application_submitted');
+  // Notify Applicant
+  sendNotification({
+    userIds: [req.user.id],
+    requestId: newRequestId,
+    title: 'Application Submitted Successfully',
+    message: `Your application FV-${String(newRequestId).padStart(4, '0')} was submitted to your Head of Department (${departmentName}) for endorsement.`,
+    type: 'application_submitted'
+  });
 
   res.status(201).json({ id: newRequestId, status: initialStatus });
 });
@@ -645,40 +700,23 @@ app.post('/api/requests/:id/officer-assessment', authenticate, (req, res) => {
       String(noteText).slice(0, 500)
     );
 
-    const insertNotification = db.prepare(`
-      INSERT INTO notifications (user_id, role_target, request_id, title, message, type)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
-
     // Notify target official (Assistant Secretary / Senior Asst / Addl Sec / Secretary)
-    insertNotification.run(
-      null,
-      target,
+    sendNotification({
+      roleTarget: target,
       requestId,
-      'Action Required: Foreign Leave Clearance',
-      `Leave application FV-${String(requestId).padStart(4, '0')} has been assessed & signed by Subject Officer ${req.user.name} and submitted for your review.`,
-      'action_required'
-    );
+      title: 'Action Required: Foreign Leave Clearance',
+      message: `Leave application FV-${String(requestId).padStart(4, '0')} has been assessed & signed by Subject Officer ${req.user.name} and submitted for your review.`,
+      type: 'action_required'
+    });
 
     // Notify Applicant
-    insertNotification.run(
-      request.applicant_id,
-      null,
+    sendNotification({
+      userIds: [request.applicant_id],
       requestId,
-      'Officer Assessment Completed & Forwarded',
-      `Subject Officer has processed & signed your leave application FV-${String(requestId).padStart(4, '0')} and forwarded it to ${ROLE_TITLES[target]?.en || target} (${nextStatus}).`,
-      'info'
-    );
-
-    // Notify Admin
-    insertNotification.run(
-      null,
-      'admin',
-      requestId,
-      'Officer Assessment Submitted & Forwarded',
-      `Subject Officer ${req.user.name} submitted assessment for FV-${String(requestId).padStart(4, '0')} (Status: ${nextStatus}).`,
-      'info'
-    );
+      title: 'Officer Assessment Completed & Forwarded',
+      message: `Subject Officer has processed & signed your leave application FV-${String(requestId).padStart(4, '0')} and forwarded it to ${ROLE_TITLES[target]?.en || target} (${nextStatus}).`,
+      type: 'info'
+    });
 
     db.exec('COMMIT');
   } catch (err) {
@@ -841,39 +879,31 @@ app.post('/api/requests/:id/secretariat-clearance', authenticate, (req, res) => 
       String(note).slice(0, 500)
     );
 
-    const insertNotification = db.prepare(`
-      INSERT INTO notifications (user_id, role_target, request_id, title, message, type)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
-
-    if (decision === 'forward') {
-      insertNotification.run(
-        null,
-        targetRole,
+    if (decision === 'forward' && targetRole) {
+      sendNotification({
+        roleTarget: targetRole,
         requestId,
-        'Action Required: Ministerial Leave Clearance',
-        `Application FV-${String(requestId).padStart(4, '0')} has been endorsed & forwarded by ${ROLE_TITLES[role]?.en || role} ${req.user.name} for your review.`,
-        'action_required'
-      );
+        title: 'Action Required: Ministerial Leave Clearance',
+        message: `Application FV-${String(requestId).padStart(4, '0')} has been endorsed & forwarded by ${ROLE_TITLES[role]?.en || role} ${req.user.name} for your review.`,
+        type: 'action_required'
+      });
     } else if (decision === 'approve' || decision === 'recommend_president') {
-      insertNotification.run(
-        null,
-        'president',
+      sendNotification({
+        roleTarget: 'president',
         requestId,
-        'Action Required: Presidential Approval for Foreign Leave',
-        `Application FV-${String(requestId).padStart(4, '0')} has been recommended by Ministry Secretary ${req.user.name} and submitted for your final Presidential Order.`,
-        'action_required'
-      );
+        title: 'Action Required: Presidential Approval for Foreign Leave',
+        message: `Application FV-${String(requestId).padStart(4, '0')} has been recommended by Ministry Secretary ${req.user.name} and submitted for your final Presidential Order.`,
+        type: 'action_required'
+      });
     }
 
-    insertNotification.run(
-      request.applicant_id,
-      null,
+    sendNotification({
+      userIds: [request.applicant_id],
       requestId,
-      `Application Status Update: ${nextStatus}`,
-      `Your foreign leave request FV-${String(requestId).padStart(4, '0')} status updated to "${nextStatus}". Remark: ${note || 'No note'}`,
-      nextStatus === 'Approved' ? 'success' : (nextStatus === 'Rejected' ? 'error' : 'info')
-    );
+      title: `Application Status Update: ${nextStatus}`,
+      message: `Your foreign leave request FV-${String(requestId).padStart(4, '0')} status updated to "${nextStatus}". Remark: ${note || 'No note'}`,
+      type: nextStatus === 'Approved' ? 'success' : (nextStatus === 'Rejected' ? 'error' : 'info')
+    });
 
     db.exec('COMMIT');
   } catch (err) {
@@ -942,28 +972,35 @@ app.post('/api/requests/:id/presidential-decision', authenticate, (req, res) => 
       `${decisionText}. ${note}`.trim().slice(0, 500)
     );
 
-    const insertNotification = db.prepare(`
-      INSERT INTO notifications (user_id, role_target, request_id, title, message, type)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
-
-    insertNotification.run(
-      request.applicant_id,
-      null,
+    // Notify Applicant
+    sendNotification({
+      userIds: [request.applicant_id],
       requestId,
-      `Presidential Order: Leave ${decision === 'approve' ? 'Approved' : 'Not Approved'}`,
-      `Your foreign travel application FV-${String(requestId).padStart(4, '0')} has been officially decided by the President ("${decisionText}"). Remark: ${note || 'None'}`,
-      decision === 'approve' ? 'success' : 'error'
-    );
+      title: `Presidential Order: Leave ${decision === 'approve' ? 'Approved' : 'Not Approved'}`,
+      message: `Your foreign travel application FV-${String(requestId).padStart(4, '0')} has been officially decided by the President ("${decisionText}"). Remark: ${note || 'None'}`,
+      type: decision === 'approve' ? 'success' : 'error'
+    });
 
-    insertNotification.run(
-      null,
-      'secretary',
+    // Notify Applicant's Head of Department
+    const applicantDeptHeadId = request.department_head_id || findDepartmentHeadId(request.department_id, request.department_name);
+    if (applicantDeptHeadId) {
+      sendNotification({
+        userIds: [applicantDeptHeadId],
+        requestId,
+        title: `Final Decision on Officer Leave: FV-${String(requestId).padStart(4, '0')}`,
+        message: `The President has officially recorded the final order for your officer ${request.applicant_name} ("${decisionText}").`,
+        type: decision === 'approve' ? 'success' : 'error'
+      });
+    }
+
+    // Notify Ministry Secretary
+    sendNotification({
+      roleTarget: 'secretary',
       requestId,
-      `Presidential Order Recorded: FV-${String(requestId).padStart(4, '0')}`,
-      `The President has officially recorded the final order for application FV-${String(requestId).padStart(4, '0')}: "${decisionText}".`,
-      'info'
-    );
+      title: `Presidential Order Recorded: FV-${String(requestId).padStart(4, '0')}`,
+      message: `The President has officially recorded the final order for application FV-${String(requestId).padStart(4, '0')}: "${decisionText}".`,
+      type: 'info'
+    });
 
     db.exec('COMMIT');
   } catch (err) {
@@ -1031,10 +1068,15 @@ app.post('/api/requests/:id/department-head-endorsement', authenticate, (req, re
   }
 
   const existingDetails = JSON.parse(request.details_json || '{}');
+  const applicantUser = db.prepare('SELECT salutation FROM users WHERE id = ?').get(request.applicant_id);
+  const defSalutation = (officerSalutation && officerSalutation !== 'Mr./Mrs./Miss')
+    ? officerSalutation
+    : (existingDetails.salutation || applicantUser?.salutation || 'Mr.');
+
   const endorsementRecord = {
     myNo: myNo || `FV-${String(requestId).padStart(4, '0')}/HR/${new Date().getFullYear()}`,
     ministryName: ministryName || 'Ministry of Technology',
-    officerSalutation: officerSalutation || 'Mr./Mrs./Miss',
+    officerSalutation: defSalutation,
     actingArrangementsCertified: Boolean(actingArrangementsCertified),
     noDisciplinaryActionCertified: Boolean(noDisciplinaryActionCertified),
     primeMinisterPermission: primeMinisterPermission || 'obtained',
@@ -1073,42 +1115,25 @@ app.post('/api/requests/:id/department-head-endorsement', authenticate, (req, re
       String(noteText).slice(0, 500)
     );
 
-    const insertNotification = db.prepare(`
-      INSERT INTO notifications (user_id, role_target, request_id, title, message, type)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
-
     // Notify Subject Officer (Reviewer) if forwarded
     if (nextStatus === 'Pending Review') {
-      insertNotification.run(
-        null,
-        'reviewer',
+      sendNotification({
+        roleTarget: 'reviewer',
         requestId,
-        'Action Required: Subject Officer Assessment & Note Sheet',
-        `Leave application FV-${String(requestId).padStart(4, '0')} has been endorsed & recommended by ${endorsementRecord.completedBy.department || 'Head of Department'}. Please prepare leave entitlement assessment and note sheet.`,
-        'action_required'
-      );
+        title: 'Action Required: Subject Officer Assessment & Note Sheet',
+        message: `Leave application FV-${String(requestId).padStart(4, '0')} has been endorsed & recommended by ${endorsementRecord.completedBy.department || 'Head of Department'}. Please prepare leave entitlement assessment and note sheet.`,
+        type: 'action_required'
+      });
     }
 
     // Notify Applicant
-    insertNotification.run(
-      request.applicant_id,
-      null,
+    sendNotification({
+      userIds: [request.applicant_id],
       requestId,
-      `Department Head Action: ${recommendation === 'recommended' ? 'Endorsed & Forwarded' : nextStatus}`,
-      `Head of Department (${req.user.name}) has completed institutional endorsement: ${recommendation === 'recommended' ? 'Recommended and forwarded to Ministry Secretary' : 'Not recommended / Returned'}.`,
-      recommendation === 'recommended' ? 'success' : 'info'
-    );
-
-    // Notify Admin
-    insertNotification.run(
-      null,
-      'admin',
-      requestId,
-      'Department Head Endorsement Submitted',
-      `${req.user.name} submitted official institutional endorsement for FV-${String(requestId).padStart(4, '0')}.`,
-      'info'
-    );
+      title: `Department Head Action: ${recommendation === 'recommended' ? 'Endorsed & Forwarded' : nextStatus}`,
+      message: `Head of Department (${req.user.name}) has completed institutional endorsement: ${recommendation === 'recommended' ? 'Recommended and forwarded to Ministry Secretary' : 'Not recommended / Returned'}.`,
+      type: recommendation === 'recommended' ? 'success' : 'info'
+    });
 
     db.exec('COMMIT');
   } catch (err) {
@@ -1235,30 +1260,25 @@ app.put('/api/requests/:id', authenticate, (req, res) => {
       );
 
       // Notify Department Head
-      db.prepare(`
-        INSERT INTO notifications (user_id, role_target, request_id, title, message, type)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(
-        request.department_head_id || null,
-        'department_head',
-        requestId,
-        'Application Resubmitted (අඩුපාඩු සකසා නැවත යොමු කරන ලදී)',
-        `Application FV-${String(requestId).padStart(4, '0')} has been amended and resubmitted by ${req.user.name}.${notesSnippet}`,
-        'application_received'
-      );
+      const targetDeptHeadId = request.department_head_id || findDepartmentHeadId(request.department_id, request.department_name);
+      if (targetDeptHeadId) {
+        sendNotification({
+          userIds: [targetDeptHeadId],
+          requestId,
+          title: 'Application Resubmitted (අඩුපාඩු සකසා නැවත යොමු කරන ලදී)',
+          message: `Application FV-${String(requestId).padStart(4, '0')} has been amended and resubmitted by ${req.user.name}.${notesSnippet}`,
+          type: 'application_received'
+        });
+      }
 
       // Notify Applicant
-      db.prepare(`
-        INSERT INTO notifications (user_id, role_target, request_id, title, message, type)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(
-        request.applicant_id,
-        null,
+      sendNotification({
+        userIds: [request.applicant_id],
         requestId,
-        'Application Resubmitted Successfully',
-        `Your application FV-${String(requestId).padStart(4, '0')} has been resubmitted and forwarded to Head of Department for review.`,
-        'success'
-      );
+        title: 'Application Resubmitted Successfully',
+        message: `Your application FV-${String(requestId).padStart(4, '0')} has been resubmitted and forwarded to Head of Department for review.`,
+        type: 'success'
+      });
     } else {
       db.prepare('INSERT INTO approvals (request_id, user_id, decision, note) VALUES (?, ?, ?, ?)').run(
         requestId,
@@ -1335,17 +1355,26 @@ app.post('/api/requests/:id/reject', authenticate, (req, res) => {
       `Application rejected by ${req.user.name} (${req.user.role}): ${rejectionNote.slice(0, 400)}`
     );
 
-    db.prepare(`
-      INSERT INTO notifications (user_id, role_target, request_id, title, message, type)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(
-      request.applicant_id,
-      null,
+    // Notify Applicant
+    sendNotification({
+      userIds: [request.applicant_id],
       requestId,
-      'Application Rejected (නිවාඩු අනුමත නොකරමි)',
-      `Your foreign leave application FV-${String(requestId).padStart(4, '0')} has been rejected by ${req.user.name} (${req.user.role}). Reason: ${rejectionNote}`,
-      'error'
-    );
+      title: 'Application Rejected (නිවාඩු අනුමත නොකරමි)',
+      message: `Your foreign leave application FV-${String(requestId).padStart(4, '0')} has been rejected by ${req.user.name} (${req.user.role}). Reason: ${rejectionNote}`,
+      type: 'error'
+    });
+
+    // If rejected at ministry level, notify the applicant's department head
+    const applicantDeptHeadId = request.department_head_id || findDepartmentHeadId(request.department_id, request.department_name);
+    if (applicantDeptHeadId && req.user.id !== applicantDeptHeadId) {
+      sendNotification({
+        userIds: [applicantDeptHeadId],
+        requestId,
+        title: `Application Rejected: FV-${String(requestId).padStart(4, '0')}`,
+        message: `The foreign leave application for officer ${request.applicant_name} has been rejected by ${req.user.name} (${req.user.role}). Reason: ${rejectionNote}`,
+        type: 'error'
+      });
+    }
 
     db.exec('COMMIT');
     res.json({ success: true, status: 'Rejected', message: 'Application rejected successfully.' });
@@ -1384,7 +1413,7 @@ app.delete('/api/requests/:id', authenticate, (req, res) => {
 app.get('/api/requests/:id/download-zip', authenticate, async (req, res) => {
   const requestId = Number(req.params.id);
   const request = db.prepare(`
-    SELECT r.*, u.name AS applicant_name, u.email AS applicant_email
+    SELECT r.*, u.name AS applicant_name, u.email AS applicant_email, u.salutation AS applicant_salutation
     FROM requests r
     JOIN users u ON u.id = r.applicant_id
     WHERE r.id = ?
@@ -1496,13 +1525,13 @@ app.delete('/api/departments/:id', authenticate, (req, res) => {
 
 app.get('/api/users', authenticate, (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Only administrators can view users.' });
-  const users = db.prepare('SELECT id, name, email, role, department_id, department_name, designation FROM users ORDER BY id ASC').all();
+  const users = db.prepare('SELECT id, name, email, role, department_id, department_name, designation, salutation FROM users ORDER BY id ASC').all();
   res.json(users);
 });
 
 app.post('/api/users', authenticate, (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Only administrators can add users.' });
-  const { name, email, role, password, designation, departmentName } = req.body || {};
+  const { name, email, role, password, designation, departmentName, salutation } = req.body || {};
   if (!name || !email || !role || !password) {
     return res.status(400).json({ error: 'Name, email, role, and password are required.' });
   }
@@ -1514,16 +1543,18 @@ app.post('/api/users', authenticate, (req, res) => {
   if (existing) {
     return res.status(400).json({ error: 'A user with this email already exists.' });
   }
+  const cleanSalutation = ['Mr.', 'Mrs.', 'Miss'].includes(salutation) ? salutation : 'Mr.';
   const hash = bcrypt.hashSync(password, 10);
-  const result = db.prepare('INSERT INTO users (name, email, role, password_hash, designation, department_name) VALUES (?, ?, ?, ?, ?, ?)').run(
+  const result = db.prepare('INSERT INTO users (name, email, role, password_hash, designation, department_name, salutation) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
     name.trim(),
     email.trim().toLowerCase(),
     role,
     hash,
     designation?.trim() || null,
-    departmentName?.trim() || null
+    departmentName?.trim() || null,
+    cleanSalutation
   );
-  res.status(201).json({ id: Number(result.lastInsertRowid), name: name.trim(), email: email.trim().toLowerCase(), role });
+  res.status(201).json({ id: Number(result.lastInsertRowid), name: name.trim(), email: email.trim().toLowerCase(), role, salutation: cleanSalutation });
 });
 
 app.delete('/api/users/:id', authenticate, (req, res) => {
@@ -1632,31 +1663,23 @@ app.post('/api/requests/:id/decision', authenticate, (req, res) => {
       String(note).slice(0, 500)
     );
 
-    // Create notifications for applicant and forwarded authority
-    const insertNotification = db.prepare(`
-      INSERT INTO notifications (user_id, role_target, request_id, title, message, type)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
-
     if (targetAuthority) {
-      insertNotification.run(
-        null,
-        targetAuthority,
-        request.id,
-        'Action Required: Foreign Leave Clearance',
-        `Request FV-${String(request.id).padStart(4, '0')} has been submitted for your formal clearance / approval.`,
-        'action_required'
-      );
+      sendNotification({
+        roleTarget: targetAuthority,
+        requestId: request.id,
+        title: 'Action Required: Foreign Leave Clearance',
+        message: `Request FV-${String(request.id).padStart(4, '0')} has been submitted for your formal clearance / approval.`,
+        type: 'action_required'
+      });
     }
 
-    insertNotification.run(
-      request.applicant_id,
-      null,
-      request.id,
-      `Application Status Update: ${nextStatus}`,
-      `Your foreign travel application FV-${String(request.id).padStart(4, '0')} has been updated to "${nextStatus}". Remark: ${note || 'No additional note'}`,
-      nextStatus === 'Approved' ? 'success' : (nextStatus === 'Rejected' ? 'error' : 'info')
-    );
+    sendNotification({
+      userIds: [request.applicant_id],
+      requestId: request.id,
+      title: `Application Status Update: ${nextStatus}`,
+      message: `Your foreign travel application FV-${String(request.id).padStart(4, '0')} has been updated to "${nextStatus}". Remark: ${note || 'No additional note'}`,
+      type: nextStatus === 'Approved' ? 'success' : (nextStatus === 'Rejected' ? 'error' : 'info')
+    });
 
     db.exec('COMMIT');
   } catch (error) {
@@ -1667,34 +1690,116 @@ app.post('/api/requests/:id/decision', authenticate, (req, res) => {
 });
 
 app.get('/api/notifications', authenticate, (req, res) => {
-  const notifications = db.prepare(`
-    SELECT n.*, r.destination, r.status AS request_status
-    FROM notifications n
-    LEFT JOIN requests r ON r.id = n.request_id
-    WHERE n.user_id = ? OR n.role_target = ? OR n.role_target = 'all'
-    ORDER BY n.created_at DESC, n.id DESC
-    LIMIT 40
-  `).all(req.user.id, req.user.role);
+  let notifications;
+  let unreadCount = 0;
 
-  const unreadCount = db.prepare(`
-    SELECT COUNT(*) AS count
-    FROM notifications
-    WHERE is_read = 0 AND (user_id = ? OR role_target = ? OR role_target = 'all')
-  `).get(req.user.id, req.user.role).count;
+  if (req.user.role === 'applicant') {
+    // Applicants ONLY ever see notifications specifically targeted to their user ID or their own applications
+    notifications = db.prepare(`
+      SELECT n.*, r.destination, r.status AS request_status
+      FROM notifications n
+      LEFT JOIN requests r ON r.id = n.request_id
+      WHERE n.user_id = ? OR (n.user_id IS NULL AND n.role_target IS NULL AND r.applicant_id = ?)
+      ORDER BY n.created_at DESC, n.id DESC
+      LIMIT 40
+    `).all(req.user.id, req.user.id);
+
+    unreadCount = db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM notifications n
+      LEFT JOIN requests r ON r.id = n.request_id
+      WHERE n.is_read = 0 AND (n.user_id = ? OR (n.user_id IS NULL AND n.role_target IS NULL AND r.applicant_id = ?))
+    `).get(req.user.id, req.user.id).count;
+  } else if (req.user.role === 'department_head') {
+    // Department Heads ONLY see notifications addressed to them, or notifications for their department's requests
+    notifications = db.prepare(`
+      SELECT n.*, r.destination, r.status AS request_status
+      FROM notifications n
+      LEFT JOIN requests r ON r.id = n.request_id
+      WHERE n.user_id = ? OR (
+        n.user_id IS NULL AND n.role_target = 'department_head' AND (
+          r.department_id = ? OR r.department_head_id = ? OR r.department_name = ?
+        )
+      )
+      ORDER BY n.created_at DESC, n.id DESC
+      LIMIT 40
+    `).all(req.user.id, req.user.department_id || 0, req.user.id, req.user.department_name || '');
+
+    unreadCount = db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM notifications n
+      LEFT JOIN requests r ON r.id = n.request_id
+      WHERE n.is_read = 0 AND (
+        n.user_id = ? OR (
+          n.user_id IS NULL AND n.role_target = 'department_head' AND (
+            r.department_id = ? OR r.department_head_id = ? OR r.department_name = ?
+          )
+        )
+      )
+    `).get(req.user.id, req.user.department_id || 0, req.user.id, req.user.department_name || '').count;
+  } else if (req.user.role === 'admin') {
+    // Admins only see notifications specifically for their user ID or explicitly addressed to admin
+    notifications = db.prepare(`
+      SELECT n.*, r.destination, r.status AS request_status
+      FROM notifications n
+      LEFT JOIN requests r ON r.id = n.request_id
+      WHERE n.user_id = ? OR (n.user_id IS NULL AND n.role_target = 'admin')
+      ORDER BY n.created_at DESC, n.id DESC
+      LIMIT 40
+    `).all(req.user.id);
+
+    unreadCount = db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM notifications n
+      WHERE n.is_read = 0 AND (n.user_id = ? OR (n.user_id IS NULL AND n.role_target = 'admin'))
+    `).get(req.user.id).count;
+  } else {
+    // Ministry officials (reviewer, assistant_secretary, senior_assistant_secretary, additional_secretary, secretary, authorized_official, minister, president)
+    notifications = db.prepare(`
+      SELECT n.*, r.destination, r.status AS request_status
+      FROM notifications n
+      LEFT JOIN requests r ON r.id = n.request_id
+      WHERE n.user_id = ? OR (n.user_id IS NULL AND n.role_target = ?)
+      ORDER BY n.created_at DESC, n.id DESC
+      LIMIT 40
+    `).all(req.user.id, req.user.role);
+
+    unreadCount = db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM notifications n
+      WHERE n.is_read = 0 AND (n.user_id = ? OR (n.user_id IS NULL AND n.role_target = ?))
+    `).get(req.user.id, req.user.role).count;
+  }
 
   res.json({ notifications, unreadCount });
 });
 
 app.post('/api/notifications/:id/read', authenticate, (req, res) => {
-  db.prepare(`UPDATE notifications SET is_read = 1 WHERE id = ?`).run(req.params.id);
+  db.prepare(`UPDATE notifications SET is_read = 1 WHERE id = ? AND (user_id = ? OR user_id IS NULL)`).run(req.params.id, req.user.id);
   res.json({ success: true });
 });
 
 app.post('/api/notifications/read-all', authenticate, (req, res) => {
-  db.prepare(`
-    UPDATE notifications SET is_read = 1
-    WHERE user_id = ? OR role_target = ? OR role_target = 'all'
-  `).run(req.user.id, req.user.role);
+  if (req.user.role === 'applicant') {
+    db.prepare(`
+      UPDATE notifications SET is_read = 1
+      WHERE user_id = ? OR (user_id IS NULL AND role_target IS NULL AND request_id IN (SELECT id FROM requests WHERE applicant_id = ?))
+    `).run(req.user.id, req.user.id);
+  } else if (req.user.role === 'department_head') {
+    db.prepare(`
+      UPDATE notifications SET is_read = 1
+      WHERE user_id = ? OR (
+        user_id IS NULL AND role_target = 'department_head' AND request_id IN (
+          SELECT id FROM requests WHERE department_id = ? OR department_head_id = ? OR department_name = ?
+        )
+      )
+    `).run(req.user.id, req.user.department_id || 0, req.user.id, req.user.department_name || '');
+  } else {
+    db.prepare(`
+      UPDATE notifications SET is_read = 1
+      WHERE user_id = ? OR (user_id IS NULL AND role_target = ?)
+    `).run(req.user.id, req.user.role);
+  }
   res.json({ success: true });
 });
 

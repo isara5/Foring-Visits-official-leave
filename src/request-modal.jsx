@@ -380,6 +380,7 @@ export const formText = {
 };
 
 const initialDetails = {
+  salutation: 'Mr.',
   fullName: '',
   department: '',
   designation: '',
@@ -658,6 +659,7 @@ export default function RequestModal({
   const [form, setForm] = useState({
     ...initialDetails,
     ...editDetails,
+    salutation: editDetails.salutation || editingRequest?.applicant_salutation || user?.salutation || 'Mr.',
     fullName: editDetails.fullName || editingRequest?.applicant_name || user?.name || '',
     destination: editDetails.destination || editingRequest?.destination || '',
     purpose: editDetails.purpose || editingRequest?.purpose || '',
@@ -1071,14 +1073,37 @@ export default function RequestModal({
                       ))}
                     </select>
                   </div>
-                  <InputField
-                    name="fullName"
-                    label={`${labels.fullName} *`}
-                    value={form.fullName}
-                    update={update}
-                    placeholder="e.g., Kankanamge Nimal Perera"
-                    required
-                  />
+                  <div className="input-group" style={{ marginBottom: '14px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '10px' }}>
+                      <div>
+                        <label className="input-label" style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '4px' }}>
+                          {language === 'si' ? 'ගෞරව නාමය' : 'Title'} *
+                        </label>
+                        <select
+                          value={form.salutation || 'Mr.'}
+                          onChange={(e) => update('salutation', e.target.value)}
+                          style={{ width: '100%', height: '36px', borderRadius: '4px', border: '1px solid #cbd5e1', padding: '0 8px', fontSize: '12px', background: '#fff' }}
+                        >
+                          <option value="Mr.">{language === 'si' ? 'Mr. (මයා)' : 'Mr.'}</option>
+                          <option value="Mrs.">{language === 'si' ? 'Mrs. (මිය)' : 'Mrs.'}</option>
+                          <option value="Miss">{language === 'si' ? 'Miss (මෙනවිය)' : 'Miss'}</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="input-label" style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '4px' }}>
+                          {`${labels.fullName} *`}
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={form.fullName}
+                          onChange={(e) => update('fullName', e.target.value)}
+                          placeholder="e.g., Kankanamge Nimal Perera"
+                          style={{ width: '100%', height: '36px', borderRadius: '4px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '12px' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
                   <InputField
                     name="designation"
                     label={`${labels.designation} *`}
@@ -4456,7 +4481,15 @@ export function printGeneral126Pdf(r) {
 
   const d = r.details || (r.applicant_name ? r : {});
   const refNo = r.id ? `FV-${String(r.id).padStart(4, '0')}` : 'FV-REF';
-  const applicantName = r.applicant_name || d.fullName || '—';
+  let rawApplicantName = r.applicant_name || d.fullName || '—';
+  let activeSalutation = (d.salutation || r.applicant_salutation || 'Mr.');
+  const prefixMatch = rawApplicantName.match(/^(Mr\.|Mrs\.|Miss|Ms\.|Dr\.|Prof\.|Eng\.|Rev\.)\s*/i);
+  if (prefixMatch) {
+    activeSalutation = prefixMatch[1];
+    rawApplicantName = rawApplicantName.slice(prefixMatch[0].length).trim();
+  }
+  const applicantName = rawApplicantName;
+  const applicantDisplayName = (rawApplicantName && rawApplicantName !== '—') ? `${activeSalutation} ${rawApplicantName}` : '—';
   const applicantEmail = r.applicant_email || d.email || '—';
   const deptName = d.department || r.department_name || '—';
   const designation = d.designation || '—';
@@ -4700,7 +4733,7 @@ export function printGeneral126Pdf(r) {
           <div class="grid-2">
             <div class="grid-item">
               <span>1. සම්පූර්ණ නම / Officer's Full Name</span>
-              <strong>${applicantName}</strong>
+              <strong>${applicantDisplayName}</strong>
             </div>
             <div class="grid-item">
               <span>2. දෙපාර්තමේන්තුව / අමාත්‍යාංශය / Dept. / Ministry</span>
@@ -4859,7 +4892,15 @@ export function printNoteSheetMinisterialPdf(r) {
   }
 
   const refNo = r.id ? `FV-${String(r.id).padStart(4, '0')}` : 'FV-REF';
-  const applicantName = r.applicant_name || d.applicantName || d.fullName || '—';
+  let rawApplicantName = r.applicant_name || d.applicantName || d.fullName || '—';
+  let activeSalutation = (d.salutation || r.applicant_salutation || 'Mr.');
+  const prefixMatch = rawApplicantName.match(/^(Mr\.|Mrs\.|Miss|Ms\.|Dr\.|Prof\.|Eng\.|Rev\.)\s*/i);
+  if (prefixMatch) {
+    activeSalutation = prefixMatch[1];
+    rawApplicantName = rawApplicantName.slice(prefixMatch[0].length).trim();
+  }
+  const applicantName = rawApplicantName;
+  const applicantDisplayName = (rawApplicantName && rawApplicantName !== '—') ? `${activeSalutation} ${rawApplicantName}` : '—';
   const designation = d.designation || r.designation || '—';
   const department = d.department || r.department_name || 'Ministry of Civil Security';
   const leaveType = r.leave_type || d.leave_type || 'Foreign Leave (විදේශ නිවාඩු)';
@@ -5362,7 +5403,7 @@ export function printNoteSheetMinisterialPdf(r) {
                   <span class="si-label">නම සහ තනතුර</span>
                 </td>
                 <td class="col-value">
-                  <strong>${applicantName}</strong>
+                  <strong>${applicantDisplayName}</strong>
                   <div class="sub-text">${designation} ${department ? `· ${department}` : ''}</div>
                 </td>
               </tr>
@@ -5607,7 +5648,9 @@ export function printDepartmentHeadLetterPdf(r) {
   const cleanMinistryName = rawMinistry.replace(/^(ministry\s+of\s+|අමාත්‍යාංශය\s*)/i, '').trim() || rawMinistry;
 
   let rawApplicantName = r.applicant_name || d.applicantName || d.fullName || '........................................................................';
-  let activeSalutation = endorsement.officerSalutation || 'Mr.';
+  let activeSalutation = (endorsement.officerSalutation && endorsement.officerSalutation !== 'Mr./Mrs./Miss')
+    ? endorsement.officerSalutation
+    : (r.applicant_salutation || d.salutation || 'Mr.');
   const prefixMatch = rawApplicantName.match(/^(Mr\.|Mrs\.|Miss|Ms\.|Dr\.|Prof\.|Eng\.|Rev\.)\s*/i);
   if (prefixMatch) {
     activeSalutation = prefixMatch[1];
@@ -7087,7 +7130,9 @@ export function DepartmentHeadEndorsementSection({ request, user, language = 'en
 
   const [myNo, setMyNo] = useState(defaultRefNo);
   const [ministryName, setMinistryName] = useState(existingEndorsement?.ministryName || 'Technology');
-  const [officerSalutation, setOfficerSalutation] = useState(existingEndorsement?.officerSalutation || 'Mr.');
+  const [officerSalutation, setOfficerSalutation] = useState(
+    existingEndorsement?.officerSalutation || request.applicant_salutation || request.details?.salutation || 'Mr.'
+  );
   const [actingArrangementsCertified, setActingArrangementsCertified] = useState(
     existingEndorsement ? Boolean(existingEndorsement.actingArrangementsCertified) : true
   );
@@ -7594,11 +7639,25 @@ export function DepartmentHeadEndorsementSection({ request, user, language = 'en
             <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#5b21b6', marginBottom: '4px' }}>
               1. {language === 'si' ? 'වැඩ බැලීම සහ විනය ක්‍රියාමාර්ග පිළිබඳ සහතිකය' : 'Acting Arrangements & Disciplinary Clearance Certification'}
             </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: '#475569' }}>
+                {language === 'si' ? 'ගෞරව නාමය තෝරන්න:' : 'Select Salutation:'}
+              </span>
+              <select
+                value={officerSalutation}
+                onChange={(e) => setOfficerSalutation(e.target.value)}
+                style={{ height: '28px', padding: '0 8px', fontSize: '11px', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff' }}
+              >
+                <option value="Mr.">{language === 'si' ? 'Mr. (මයා)' : 'Mr.'}</option>
+                <option value="Mrs.">{language === 'si' ? 'Mrs. (මිය)' : 'Mrs.'}</option>
+                <option value="Miss">{language === 'si' ? 'Miss (මෙනවිය)' : 'Miss'}</option>
+              </select>
+            </div>
             <div style={{ fontSize: '11px', lineHeight: 1.6, color: '#1e293b', marginBottom: '8px' }}>
-              <strong>1. {applicantName}</strong> {language === 'si' ? 'මහතාගේ/මහත්මියගේ නිවාඩු ඉල්ලුම් පත්‍රයේ පිටපත් දෙකක් මේ සමග ඉදිරිපත් කරමි. මේ නිලධාරියාගේ/නිලධාරිනියගේ වැඩ බැලීම සඳහා වැඩ පිළිවෙලක් යොදා ඇති බවත්, ඔහුට/ඇයට විරුද්ධව විනයානුකූල ක්‍රියා මාර්ගයක් දැනට පවත්වන්නේවත්, එසේ විනයානුකූල ක්‍රියා මාර්ගයක් ගැනීමට අදහස් කර ඇත්තේවත් නැති බව සහතික කරමි.' : 'මහතාගේ/මහත්මියගේ නිවාඩු ඉල්ලුම් පත්‍රයේ පිටපත් දෙකක් මේ සමග ඉදිරිපත් කරමි. මේ නිලධාරියාගේ/නිලධාරිනියගේ වැඩ බැලීම සඳහා වැඩ පිළිවෙලක් යොදා ඇති බවත්, ඔහුට/ඇයට විරුද්ධව විනයානුකූල ක්‍රියා මාර්ගයක් දැනට පවත්වන්නේවත්, එසේ විනයානුකූල ක්‍රියා මාර්ගයක් ගැනීමට අදහස් කර ඇත්තේවත් නැති බව සහතික කරමි.'}
+              <strong>1. {applicantName}</strong> {officerSalutation === 'Mrs.' ? 'මහත්මියගේ' : (officerSalutation === 'Miss' ? 'මෙනවියගේ' : 'මහතාගේ')} නිවාඩු ඉල්ලුම් පත්‍රයේ පිටපත් දෙකක් මේ සමග ඉදිරිපත් කරමි. මේ නිලධාරියාගේ/නිලධාරිනියගේ වැඩ බැලීම සඳහා වැඩ පිළිවෙලක් යොදා ඇති බවත්, ඔහුට/ඇයට විරුද්ධව විනයානුකූල ක්‍රියා මාර්ගයක් දැනට පවත්වන්නේවත්, එසේ විනයානුකූල ක්‍රියා මාර්ගයක් ගැනීමට අදහස් කර ඇත්තේවත් නැති බව සහතික කරමි.
             </div>
             <div style={{ fontSize: '10px', color: '#64748b', fontStyle: 'italic', marginBottom: '10px' }}>
-              "I forward herewith two copies of the leave application of {applicantName}. I certify that acting arrangements have been made and that there is no disciplinary action pending or contemplated against this officer."
+              "I forward herewith two copies of the leave application of {officerSalutation} {applicantName}. I certify that acting arrangements have been made and that there is no disciplinary action pending or contemplated against this officer."
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', background: '#fff', padding: '8px 12px', borderRadius: '4px', border: '1px solid #ddd6fe' }}>
@@ -9266,6 +9325,8 @@ export function printSubjectOfficerNoteSheetPdf(r) {
   }
   const refNo = r.id ? `FV-${String(r.id).padStart(4, '0')}` : 'FV-REF';
   const applicantName = d.fullName || r.applicant_name || '—';
+  const activeSalutation = r.applicant_salutation || d.salutation || 'Mr.';
+  const sinhalaHonorific = activeSalutation === 'Mrs.' ? 'මහත්මිය' : (activeSalutation === 'Miss' ? 'මෙනවිය' : 'මහතා');
   const designation = d.designation || r.designation || '—';
   const department = r.department_name || d.department || '—';
   const rawMinistry = d.ministry || 'Technology';
@@ -9331,7 +9392,7 @@ export function printSubjectOfficerNoteSheetPdf(r) {
     <div class="note-content">
       <p><strong>ගරු ලේකම්තුමා / අතිරේක ලේකම්තුමා වෙත (To Ministry Secretary / Additional Secretary):</strong></p>
       <p>1. <strong>හඳුන්වාදීම සහ පසුබිම (Introduction & Context):</strong><br />
-      ${department} හි සේවය කරන ${designation} ${applicantName} මහතා/මිය විසින් ${r.start_date || '—'} සිට ${r.end_date || '—'} දක්වා ${r.destination || '—'} බලා නිවාඩු ලබා ගැනීම සඳහා ඉදිරිපත් කරන ලද ඉල්ලීම ආයතන ප්‍රධානියාගේ නිර්දේශය සහිතව අමාත්‍යාංශය වෙත ලැබී ඇත.</p>
+      ${department} හි සේවය කරන ${designation} ${applicantName} ${sinhalaHonorific} විසින් ${r.start_date || '—'} සිට ${r.end_date || '—'} දක්වා ${r.destination || '—'} බලා නිවාඩු ලබා ගැනීම සඳහා ඉදිරිපත් කරන ලද ඉල්ලීම ආයතන ප්‍රධානියාගේ නිර්දේශය සහිතව අමාත්‍යාංශය වෙත ලැබී ඇත.</p>
       
       <p>2. <strong>නිවාඩු හිමිකම සහ ආයතන සංග්‍රහයට අනුකූලතාව (Entitlement & Est. Code Verification):</strong><br />
       අදාළ නිලධාරියාගේ නිවාඩු ලේඛන පරීක්ෂා කර බැලූ අතර, ඉල්ලා ඇති කාලසීමාව සඳහා ප්‍රමාණවත් නිවාඩු ශේෂයක් පවතින බවට තහවුරු කර ඇත. වැඩබැලීමේ විධිවිධාන ආයතන ප්‍රධානියා විසින් සහතික කර ඇති අතර විනය ක්‍රියාමාර්ග කිසිවක් නොමැත.</p>
