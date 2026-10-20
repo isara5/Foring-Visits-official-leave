@@ -302,7 +302,7 @@ export default function ProfileSection({ user, onProfileUpdated, token, language
             </h3>
 
             <div style={{ display: 'grid', gap: '14px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(135px, 145px) 1fr', gap: '12px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
                     {language === 'si' ? 'ගෞරව නාමය *' : 'Title *'}
@@ -310,7 +310,7 @@ export default function ProfileSection({ user, onProfileUpdated, token, language
                   <select
                     value={salutation}
                     onChange={(e) => setSalutation(e.target.value)}
-                    style={{ width: '100%', height: '38px', padding: '0 8px', fontSize: '12.5px', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box', background: '#fff' }}
+                    className="form-select"
                   >
                     <option value="Mr.">{language === 'si' ? 'Mr. (මයා)' : 'Mr.'}</option>
                     <option value="Mrs.">{language === 'si' ? 'Mrs. (මිය)' : 'Mrs.'}</option>

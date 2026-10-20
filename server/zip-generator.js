@@ -655,6 +655,316 @@ function getGeneral126Html(r) {
 </html>`;
 }
 
+
+// 1.2 APPENDIX 16 (FORM 16) - OFFICIAL TRAVEL PRIOR PERMISSION
+export function getAppendix16Html(r) {
+  const d = r.details || {};
+  const refNo = r.id ? `FV-${String(r.id).padStart(4, '0')}` : 'FV-REF';
+  const deptEndorsement = d.departmentHeadEndorsement || {};
+  const activeSalutation = (deptEndorsement.officerSalutation && deptEndorsement.officerSalutation !== 'Mr./Mrs./Miss')
+    ? deptEndorsement.officerSalutation
+    : (r.applicant_salutation || d.salutation || 'Mr.');
+  let rawApplicantName = r.applicant_name || d.fullName || '—';
+  const prefixMatch = rawApplicantName.match(/^(Mr\.|Mrs\.|Miss|Ms\.|Dr\.|Prof\.|Eng\.|Rev\.)\s*/i);
+  if (prefixMatch) {
+    rawApplicantName = rawApplicantName.slice(prefixMatch[0].length).trim();
+  }
+  const applicantName = `${activeSalutation} ${rawApplicantName}`;
+  const nic = d.nic || '—';
+  const dateOfBirth = d.dateOfBirth || '—';
+  const designation = d.designation || '—';
+  const grade = d.grade || '';
+  const service = d.service || '—';
+  const firstApptDate = d.firstAppointmentDate || '—';
+  const department = d.department || r.department_name || '—';
+  const ministry = d.ministry || deptEndorsement.ministryName || 'Ministry of Public Administration';
+
+  const dutyCoverName = d.dutyCoverName || '—';
+  const dutyCoverDesignation = d.dutyCoverDesignation || '—';
+
+  const purpose = r.purpose || d.purpose || '—';
+  const trainingField = d.trainingField || purpose;
+  const destination = r.destination || d.destination || '—';
+  const startDate = r.start_date || d.startDate || '—';
+  const endDate = r.end_date || d.endDate || '—';
+  const daysApplied = d.daysApplied || (startDate && endDate && startDate !== '—' && endDate !== '—' ? `${Math.max(1, Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1)}` : '—');
+  const visitInstitution = d.visitInstitution || '—';
+  const courseStartDate = d.courseStartDate || startDate;
+  const courseEndDate = d.courseEndDate || endDate;
+  const prevTripReportSubmitted = d.prevTripReportSubmitted || 'N/A';
+
+  const airfareFunding = d.airfareFunding || 'Government of Sri Lanka (GOSL)';
+  const maintenanceFunding = d.maintenanceFunding || 'Daily Subsistence Allowance (DSA)';
+  const fundingSource = d.fundingSource || 'Government Funds';
+
+  const travelHistory = Array.isArray(d.travelHistory) ? d.travelHistory : [];
+  const appDate = d.applicationDate || r.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10);
+  const signature = r.signature || d.signature;
+
+  // Department Head Endorsement
+  const hasDeptEndorsement = Boolean(deptEndorsement.signature || deptEndorsement.myNo);
+  const deptHeadName = deptEndorsement.completedBy?.name || deptEndorsement.signatoryName || 'Head of Department';
+  const deptHeadDesig = deptEndorsement.completedBy?.designation || deptEndorsement.signatoryDesignation || 'Head of Department / Institution';
+  const deptHeadSig = deptEndorsement.signature;
+  const deptHeadDate = deptEndorsement.date || deptEndorsement.endorsementDate || '';
+
+  const travelHistoryRows = travelHistory.length > 0
+    ? travelHistory.map((row, idx) => `
+        <tr>
+          <td style="text-align: center;">${idx + 1}</td>
+          <td>${row.year || '—'}</td>
+          <td>${row.purpose || '—'}</td>
+          <td>${row.period || '—'}</td>
+          <td>${row.country || '—'}</td>
+        </tr>
+      `).join('')
+    : `<tr><td colspan="5" style="text-align: center; color: #64748b; font-style: italic; padding: 10px;">No foreign visits recorded in previous 3 years / පෙර සංචාර නොමැත</td></tr>`;
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Appendix 16 - Prior Permission - ${refNo} - ${applicantName}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Sinhala", "Helvetica Neue", Arial, sans-serif;
+      color: #0f172a;
+      background: #ffffff;
+      margin: 0;
+      padding: 0;
+      line-height: 1.45;
+      font-size: 11px;
+    }
+    .sheet {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 24px 28px;
+      background: #ffffff;
+    }
+    .header-box {
+      text-align: center;
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+    }
+    .header-box h2 {
+      margin: 0 0 3px 0;
+      font-size: 11px;
+      font-weight: 700;
+      color: #475569;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+    .header-box h1 {
+      margin: 2px 0;
+      font-size: 14.5px;
+      font-weight: 800;
+      color: #0f172a;
+      text-transform: uppercase;
+    }
+    .header-box .sub-title {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #1e3a8a;
+      margin-top: 3px;
+    }
+    .ref-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      padding: 6px 12px;
+      border-radius: 4px;
+      margin-bottom: 14px;
+      font-size: 11px;
+    }
+    .part-title {
+      background: #f1f5f9;
+      border-left: 3.5px solid #1e3a8a;
+      padding: 5px 10px;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #0f172a;
+      margin: 14px 0 8px 0;
+      text-transform: uppercase;
+    }
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 10px;
+      font-size: 11px;
+    }
+    table.data-table th, table.data-table td {
+      border: 1px solid #cbd5e1;
+      padding: 5.5px 8px;
+      vertical-align: top;
+    }
+    table.data-table th {
+      background: #f8fafc;
+      font-weight: 600;
+      color: #334155;
+      text-align: left;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 14px;
+      margin-bottom: 10px;
+    }
+    .item {
+      border-bottom: 1px dotted #cbd5e1;
+      padding-bottom: 4px;
+    }
+    .item .lbl {
+      display: block;
+      font-size: 9.5px;
+      color: #64748b;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-bottom: 1px;
+    }
+    .item .val {
+      font-size: 11.5px;
+      color: #0f172a;
+      font-weight: 700;
+    }
+    .sig-row {
+      margin-top: 18px;
+      padding-top: 10px;
+      border-top: 1px dashed #cbd5e1;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .sig-box {
+      text-align: center;
+      width: 240px;
+    }
+    .sig-img {
+      max-height: 48px;
+      max-width: 200px;
+      display: block;
+      margin: 0 auto 4px auto;
+    }
+    .sig-line {
+      border-top: 1px dotted #0f172a;
+      padding-top: 4px;
+      font-size: 10px;
+      color: #475569;
+    }
+    @media print {
+      body { padding: 0; background: #fff; }
+      .sheet { max-width: 100%; padding: 12mm 15mm; }
+      @page { size: A4 portrait; margin: 10mm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+    <div class="header-box">
+      <h2>Democratic Socialist Republic of Sri Lanka · Establishments Code</h2>
+      <h1>Appendix 16 (උපග්‍රන්ථ 16) · Form 16</h1>
+      <div class="sub-title">Application for Prior Permission for Official Travel Abroad / රාජ්‍ය නිලධාරීන්ගේ නිල විදේශ සංචාර සඳහා පූර්ව අවසරය ලබාගැනීමේ අයදුම්පත</div>
+    </div>
+
+    <div class="ref-bar">
+      <div><strong>Application Ref:</strong> <span style="color: #1e3a8a; font-weight: 800;">${refNo}</span></div>
+      <div><strong>Nature of Travel:</strong> Official Duty (නිල රාජකාරි)</div>
+      <div><strong>Date:</strong> ${appDate}</div>
+    </div>
+
+    <div class="part-title">1. Particulars of the Officer (නිලධාරියා පිළිබඳ තොරතුරු)</div>
+    <div class="grid-2">
+      <div class="item"><span class="lbl">1.1 Full Name (සම්පූර්ණ නම)</span><span class="val">${applicantName}</span></div>
+      <div class="item"><span class="lbl">1.2 National Identity Card No. (ජා.හැ. අංකය)</span><span class="val">${nic}</span></div>
+      <div class="item"><span class="lbl">1.3 Date of Birth (උපන් දිනය)</span><span class="val">${dateOfBirth}</span></div>
+      <div class="item"><span class="lbl">1.4 Post & Grade (තනතුර සහ ශ්‍රේණිය)</span><span class="val">${designation} ${grade ? '(' + grade + ')' : ''}</span></div>
+      <div class="item"><span class="lbl">1.5 Service to which belongs (අයත් සේවය)</span><span class="val">${service}</span></div>
+      <div class="item"><span class="lbl">1.6 Date of First Appointment (මුල් පත්වීම් දිනය)</span><span class="val">${firstApptDate}</span></div>
+      <div class="item"><span class="lbl">1.7 Department / Institution (දෙපාර්තමේන්තුව / ආයතනය)</span><span class="val">${department}</span></div>
+      <div class="item"><span class="lbl">1.8 Ministry / Provincial Council (අමාත්‍යාංශය)</span><span class="val">${ministry}</span></div>
+    </div>
+
+    <div class="part-title">2. Acting / Duty Covering Arrangements (වැඩ බැලීමේ විධිවිධාන)</div>
+    <div class="grid-2">
+      <div class="item"><span class="lbl">2.1 Name of Covering Officer (වැඩ ආවරණය කරන නිලධාරියාගේ නම)</span><span class="val">${dutyCoverName}</span></div>
+      <div class="item"><span class="lbl">2.2 Designation of Covering Officer (වැඩ ආවරණය කරන නිලධාරියාගේ තනතුර)</span><span class="val">${dutyCoverDesignation}</span></div>
+    </div>
+
+    <div class="part-title">3. Details of Official Visit / Training (නිල සංචාරයේ / පුහුණුවේ විස්තර)</div>
+    <div class="grid-2">
+      <div class="item" style="grid-column: span 2;"><span class="lbl">3.1 Purpose of Visit / Field of Training (සංචාරයේ අරමුණ / පුහුණු ක්ෂේත්‍රය)</span><span class="val">${trainingField}</span></div>
+      <div class="item"><span class="lbl">3.2 Destination Country & City (ගමනාන්ත රට සහ නගරය)</span><span class="val">${destination}</span></div>
+      <div class="item"><span class="lbl">3.3 Period of Visit & Days (කාලසීමාව සහ දින ගණන)</span><span class="val">${startDate} to ${endDate} (${daysApplied} Days)</span></div>
+      <div class="item"><span class="lbl">3.4 Sponsoring Agency / Host (අනුග්‍රාහක / ආරාධිත ආයතනය)</span><span class="val">${visitInstitution}</span></div>
+      <div class="item"><span class="lbl">3.5 Course / Programme Dates (වැඩසටහන් දින)</span><span class="val">${courseStartDate} to ${courseEndDate}</span></div>
+      <div class="item" style="grid-column: span 2;"><span class="lbl">3.6 Previous Official Tour Report Submitted? (පෙර සංචාර වාර්තාව ඉදිරිපත් කර තිබේද?)</span><span class="val">${prevTripReportSubmitted}</span></div>
+    </div>
+
+    <div class="part-title">4. Expenditure & Financial Allocations (වියදම් පියවාගැනීම සහ ප්‍රතිපාදන)</div>
+    <div class="grid-2">
+      <div class="item"><span class="lbl">4.1 Airfare Funding (ගුවන් ගමන් වියදම්)</span><span class="val">${airfareFunding}</span></div>
+      <div class="item"><span class="lbl">4.2 Maintenance Abroad / Subsistence (නඩත්තු / දීමනා වියදම්)</span><span class="val">${maintenanceFunding}</span></div>
+      <div class="item" style="grid-column: span 2;"><span class="lbl">4.3 Funding Source / Government Vote (ශ්‍රී ලංකා රජයේ වැය ශීර්ෂය / මූලාශ්‍රය)</span><span class="val">${fundingSource}</span></div>
+    </div>
+
+    <div class="part-title">5. Foreign Visits During Current Year and Preceding Three Years (පසුගිය වසර 3 තුළ විදේශ සංචාර)</div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th style="width: 35px; text-align: center;">#</th>
+          <th style="width: 80px;">Year (වර්ෂය)</th>
+          <th>Purpose (අරමුණ)</th>
+          <th style="width: 140px;">Period (කාලසීමාව)</th>
+          <th style="width: 120px;">Country (රට)</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${travelHistoryRows}
+      </tbody>
+    </table>
+
+    <div class="part-title">6. Certification by the Applicant (අයදුම්කරුගේ සහතිකය)</div>
+    <p style="margin: 4px 0 10px 0; font-size: 10.5px; color: #334155; line-height: 1.5;">
+      I hereby certify that the particulars furnished above are true and accurate. I undertake to submit a report on the official travel within one month of return to Sri Lanka in terms of Establishments Code Chapter XV Section 10:1.<br />
+      <em>ඉහත සඳහන් තොරතුරු සත්‍ය හා නිවැරදි බවට මෙයින් සහතික වන අතර ආපසු පැමිණ මාසයක් ඇතුළත සංචාරක වාර්තාවක් ඉදිරිපත් කිරීමට එකඟ වෙමි.</em>
+    </p>
+
+    <div class="sig-row">
+      <div>
+        <div style="font-size: 11px;"><strong>Date (දිනය):</strong> ${appDate}</div>
+        <div style="font-size: 10.5px; color: #64748b; margin-top: 2px;">Applicant: ${applicantName}</div>
+      </div>
+      <div class="sig-box">
+        ${signature ? `<img src="${signature}" class="sig-img" alt="Applicant Signature" />` : '<div style="height: 38px;"></div>'}
+        <div class="sig-line">Signature of Applicant / අයදුම්කරුගේ අත්සන</div>
+      </div>
+    </div>
+
+    ${hasDeptEndorsement ? `
+      <div class="part-title" style="margin-top: 16px;">7. Head of Department Recommendation (දෙපාර්තමේන්තු ප්‍රධානියාගේ නිර්දේශය)</div>
+      <p style="margin: 4px 0 8px 0; font-size: 10.5px; color: #334155;">
+        I certify that acting arrangements have been made and that no disciplinary inquiry is pending or contemplated against this officer. The official travel is recommended.<br />
+        <em>වැඩ ආවරණ විධිවිධාන යොදා ඇති බවත් කිසිදු විනය පරීක්ෂණයක් නොමැති බවත් සහතික කර නිර්දේශ කරමි.</em>
+      </p>
+      <div class="sig-row" style="margin-top: 10px;">
+        <div>
+          <div style="font-size: 11px;"><strong>Date (දිනය):</strong> ${deptHeadDate || appDate}</div>
+          <div style="font-size: 10.5px; color: #64748b; margin-top: 2px;">Head of Dept: ${deptHeadName}</div>
+        </div>
+        <div class="sig-box">
+          ${deptHeadSig ? `<img src="${deptHeadSig}" class="sig-img" alt="Dept Head Signature" />` : '<div style="height: 38px;"></div>'}
+          <div class="sig-line">${deptHeadName}<br /><span style="font-size: 9.5px; color: #64748b;">${deptHeadDesig}</span></div>
+        </div>
+      </div>
+    ` : ''}
+  </div>
+</body>
+</html>`;
+}
+
 // 2. FOR OFFICE USE ONLY HTML (Est. Code XII 13–19)
 function getOfficeUseOnlyHtml(r) {
   const d = r.details || {};
@@ -1059,6 +1369,16 @@ export async function generateRequestZip(request) {
     await htmlToPdf(html1, pdf1Path);
     zip.file('1_General_126_Application.pdf', fs.readFileSync(pdf1Path));
 
+    // 1.2 Appendix 16 / Form 16 PDF (Official duty requires BOTH General 126 and Appendix 16!)
+    const leaveType = request.leave_type || d.leaveType || '';
+    const isOfficial = leaveType === 'Official duty' || d.leaveType === 'Official duty';
+    if (isOfficial) {
+      const htmlApp16 = getAppendix16Html(request);
+      const pdfApp16Path = path.join(workDir, '1_2_Appendix_16_Prior_Permission.pdf');
+      await htmlToPdf(htmlApp16, pdfApp16Path);
+      zip.file('1_2_Appendix_16_Prior_Permission.pdf', fs.readFileSync(pdfApp16Path));
+    }
+
     // 2. For Office Use Only PDF (Only if Subject Officer has completed leave entitlement verification)
     const hasOfficeUseCompleted = Boolean(d.officerCompleted || d.officerAssessment?.total || d.officerSignature);
     if (hasOfficeUseCompleted) {
@@ -1115,10 +1435,11 @@ export async function generateRequestZip(request) {
     const uploadFolder = zip.folder('7_Applicant_Uploaded_Documents');
 
     const uploadItems = [
-      { key: 'institutionLetter', filename: '7_1_Institution_Head_Letter.pdf', dataUrl: docs.institutionLetter?.dataUrl },
-      { key: 'passportImage', filename: '7_2_Passport_Bio_Page.pdf', dataUrl: docs.passportImage?.dataUrl },
-      { key: 'requestLetter', filename: '7_3_Applicant_Request_Letter.pdf', dataUrl: docs.requestLetter?.dataUrl },
-      { key: 'otherDocuments', filename: '7_4_Other_Supporting_Document.pdf', dataUrl: docs.otherDocuments?.dataUrl },
+      { key: 'passportImage', filename: '7_1_Passport_Bio_Page.pdf', dataUrl: docs.passportImage?.dataUrl },
+      { key: 'invitationLetter', filename: '7_2_Official_Invitation_Letter.pdf', dataUrl: docs.invitationLetter?.dataUrl },
+      { key: 'institutionLetter', filename: '7_3_Head_of_Department_Letter.pdf', dataUrl: docs.institutionLetter?.dataUrl },
+      { key: 'requestLetter', filename: '7_4_Applicant_Request_Letter.pdf', dataUrl: docs.requestLetter?.dataUrl },
+      { key: 'otherDocuments', filename: '7_5_Other_Supporting_Document.pdf', dataUrl: docs.otherDocuments?.dataUrl },
     ];
 
     let hasAnyUploads = false;

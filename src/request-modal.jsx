@@ -31,7 +31,9 @@ import {
   FileDown,
   Printer,
   FolderArchive,
-  Lock
+  Lock,
+  Mail,
+  Info
 } from 'lucide-react';
 import SignaturePad from './signature-pad.jsx';
 
@@ -51,20 +53,25 @@ export const formText = {
     app16Code: 'APPENDIX 16 (උපග්‍රන්ථ 16)',
     app16Title: 'Application for Prior Permission to Travel Abroad',
     app16Law: 'Public Officers Foreign Travel Regulations · Part 1',
-    step1Tag: 'Step 1 of 2: General 126 Leave Application',
-    step2Tag: 'Step 2 of 2: Appendix 16 Prior Permission',
+    step1Tag: 'Step 1 of 3: General 126 Leave Application',
+    step2Tag: 'Step 2 of 3: Appendix 16 Prior Permission',
+    step3Tag: 'Step 3 of 3: Upload Documents (Optional)',
     personalTag: 'Personal / Private Leave · General 126 Form',
-    officialTag: 'Official Duty · General 126 + Appendix 16',
-    step1Notice: 'Step 1: Fill out General 126 (Application for leave out of Sri Lanka). You will proceed to Appendix 16 in the next step.',
-    step2Notice: 'Step 2: Complete Appendix 16 prior permission details before submitting for official approval.',
+    officialTag: 'Official Duty · General 126 + Appendix 16 + Documents',
+    step1Notice: 'Step 1: Fill out General 126 (Application for leave out of Sri Lanka). You will proceed to Appendix 16 in Step 2.',
+    step2Notice: 'Step 2: Complete Appendix 16 prior permission details, check declaration, and sign. You will proceed to document uploads in Step 3.',
+    officialStep3Notice: 'Step 3: Upload supporting documents for your official travel application (Passport, Invitation letter, Dept Head letter, Request letter, Other). All 5 documents are optional (not required).',
     personalStep1Notice: 'Step 1: Fill out General 126 Form (items 1–12) with your particulars, dates, and signature. Click Next to upload required supporting documents in Step 2.',
     personalStep2Notice: 'Step 2: Upload live supporting documents (PDF / Image) before final submission.',
     nextStepBtn: 'Next: Appendix 16 →',
     prevStepBtn: '← Back: General 126',
     nextToDocsBtn: 'Next: Upload Documents →',
+    backToApp16Btn: '← Back: Appendix 16',
     backToGen126Btn: '← Back: General 126',
     submitPersonalBtn: 'Submit Personal Leave Application',
     submitOfficialBtn: 'Submit Official Travel Application',
+    docInvitationTitle: '2. Official Invitation Letter',
+    docInvitationDesc: 'Official invitation / nomination letter from host agency (PDF / Image - Optional)',
 
     // Section Titles
     officerSection: '1. Officer & Service Particulars',
@@ -218,20 +225,25 @@ export const formText = {
     app16Code: 'උපග්‍රන්ථ 16 (APPENDIX 16)',
     app16Title: 'රාජ්‍ය නිලධාරීන් විදේශගතවීම සඳහා පූර්ව අවසර ලබාගැනීමේ අයදුම්පත්‍රය',
     app16Law: 'රාජ්‍ය නිලධාරීන්ගේ විදේශ සංචාර පිළිබඳ රෙගුලාසි · 1 වන කොටස',
-    step1Tag: 'පියවර 1 / 2: සාමාන්‍ය 126 නිවාඩු අයදුම්පත',
-    step2Tag: 'පියවර 2 / 2: උපග්‍රන්ථ 16 පූර්ව අවසර අයදුම්පත',
+    step1Tag: 'පියවර 1 / 3: සාමාන්‍ය 126 නිවාඩු අයදුම්පත',
+    step2Tag: 'පියවර 2 / 3: උපග්‍රන්ථ 16 පූර්ව අවසර අයදුම්පත',
+    step3Tag: 'පියවර 3 / 3: උපකාරක ලේඛන ඇමිණීම (විකල්ප)',
     personalTag: 'පෞද්ගලික නිවාඩු · සාමාන්‍ය 126 අයදුම්පත',
-    officialTag: 'නිල රාජකාරි · සාමාන්‍ය 126 + උපග්‍රන්ථ 16',
+    officialTag: 'නිල රාජකාරි · සාමාන්‍ය 126 + උපග්‍රන්ථ 16 + ලේඛන ඇමිණීම',
     step1Notice: 'පියවර 1: සාමාන්‍ය 126 (Gen-126) නිවාඩු ඉල්ලුම්පත මුලින් සම්පූර්ණ කරන්න. ඉන්පසු උපග්‍රන්ථ 16 වෙත යොමු කෙරේ.',
-    step2Notice: 'පියවර 2: උපග්‍රන්ථ 16 (Appendix 16) පූර්ව අවසර විස්තර සම්පූර්ණ කර අවසන් අනුමැතිය සඳහා ඉදිරිපත් කරන්න.',
+    step2Notice: 'පියවර 2: උපග්‍රන්ථ 16 (Appendix 16) පූර්ව අවසර විස්තර සම්පූර්ණ කර අත්සන් කරන්න. ඊළඟ පියවරේදී උපකාරක ලේඛන ඇමිණිය හැක.',
+    officialStep3Notice: 'පියවර 3: අයදුම්පත සඳහා අදාළ උපකාරක ලේඛන අමුණන්න (ගමන් බලපත්‍රය, ආරාධනා ලිපිය, ආයතන ප්‍රධානී ලිපිය, ඉල්ලීම් ලිපිය, වෙනත් ලේඛන - සියල්ල විකල්ප / අනිවාර්ය නොවේ).',
     personalStep1Notice: 'පියවර 1: සාමාන්‍ය 126 (Gen-126) පෝරමය (අංක 1 සිට 12 දක්වා) සම්පූර්ණ කර අත්සන් තබන්න. ඊළඟ පියවරේදී අදාළ උපකාරක ලේඛන උඩුගත කෙරේ.',
     personalStep2Notice: 'පියවර 2: අයදුම්පත ඉදිරිපත් කිරීමට පෙර අවශ්‍ය සජීවී උපකාරක ලේඛන (PDF / ඡායාරූප) උඩුගත කරන්න.',
     nextStepBtn: 'මීළඟ: උපග්‍රන්ථ 16 වෙත →',
     prevStepBtn: '← ආපසු: සාමාන්‍ය 126',
-    nextToDocsBtn: 'ඊළඟ: ලේඛන ඇමිණීම →',
+    nextToDocsBtn: 'මීළඟ: ලේඛන ඇමිණීම වෙත →',
+    backToApp16Btn: '← ආපසු: උපග්‍රන්ථ 16',
     backToGen126Btn: '← ආපසු: සාමාන්‍ය 126',
     submitPersonalBtn: 'පෞද්ගලික නිවාඩු අයදුම්පත ඉදිරිපත් කරන්න',
     submitOfficialBtn: 'නිල සංචාරක අයදුම්පත ඉදිරිපත් කරන්න',
+    docInvitationTitle: '2. නිල ආරාධනා ලිපිය (Invitation Letter)',
+    docInvitationDesc: 'සත්කාරක ආයතනයෙන් ලද ආරාධනා හෝ නාමයෝජනා ලිපිය (PDF / ඡායාරූප - අනිවාර්ය නැත)',
 
     // Section Titles
     officerSection: '1. නිලධාරි සහ සේවා විස්තර',
@@ -404,8 +416,9 @@ const initialDetails = {
   abroadEmail: '',
   applicationDate: new Date().toISOString().slice(0, 10),
   documents: {
-    institutionLetter: null,
     passportImage: null,
+    invitationLetter: null,
+    institutionLetter: null,
     requestLetter: null,
     otherDocuments: null,
   },
@@ -799,6 +812,27 @@ export default function RequestModal({
     }
   }
 
+  function validateStep2() {
+    setError('');
+    if (!validateGen126Fields()) return false;
+    if (!form.nic || !form.dateOfBirth || !form.ministry || !form.dutyCoverName || !form.dutyCoverDesignation) {
+      setError(labels.step2Incomplete);
+      return false;
+    }
+    if (!declaration || !signature) {
+      setError(labels.step2Incomplete);
+      return false;
+    }
+    return true;
+  }
+
+  function goToStep3() {
+    if (validateStep2()) {
+      setError('');
+      setStep(3);
+    }
+  }
+
   function validatePersonalStep1() {
     setError('');
     if (!validateGen126Fields()) return false;
@@ -842,15 +876,12 @@ export default function RequestModal({
         goToStep2();
         return;
       }
-      if (!validateGen126Fields()) return;
-      if (!form.nic || !form.dateOfBirth || !form.ministry || !form.dutyCoverName || !form.dutyCoverDesignation) {
-        setError(labels.step2Incomplete);
+      if (step === 2) {
+        goToStep3();
         return;
       }
-      if (!declaration || !signature) {
-        setError(labels.step2Incomplete);
-        return;
-      }
+      if (!validateStep2()) return;
+      // In Step 3: All 5 documents are optional (not required), proceed to submit
     } else {
       if (step === 1) {
         goToPersonalStep2();
@@ -915,7 +946,7 @@ export default function RequestModal({
           <div>
             <div className="eyebrow">
               {isOfficial
-                ? (step === 1 ? labels.step1Tag : labels.step2Tag)
+                ? (step === 1 ? labels.step1Tag : (step === 2 ? labels.step2Tag : labels.step3Tag))
                 : (step === 1 ? labels.step1Tag : labels.step2Tag)}
             </div>
             <h2>
@@ -928,19 +959,19 @@ export default function RequestModal({
                         ? `අයදුම්පත සංස්කරණය · FV-${String(editingRequest.id).padStart(4, '0')}`
                         : `Edit Application · FV-${String(editingRequest.id).padStart(4, '0')}`))
                 : (isOfficial
-                    ? (step === 1 ? labels.gen126Title : labels.app16Title)
+                    ? (step === 1 ? labels.gen126Title : (step === 2 ? labels.app16Title : labels.docsHeading))
                     : (step === 1 ? labels.gen126Title : labels.docsHeading))}
             </h2>
             <div className={`modal-leave-tag ${isOfficial ? 'official' : 'personal'}`}>
               {isOfficial ? (
-                <>🏛️ {language === 'si' ? 'නිල රාජකාරි සංචාරය · General 126 + Appendix 16' : 'Official Duty · General 126 + Appendix 16'}</>
+                <>🏛️ {language === 'si' ? 'නිල රාජකාරි සංචාරය · General 126 + Appendix 16 + උපකාරක ලේඛන' : 'Official Duty · General 126 + Appendix 16 + Documents'}</>
               ) : (
                 <>✈️ {language === 'si' ? 'පෞද්ගලික නිවාඩු · General 126 + උපකාරක ලේඛන' : 'Personal Leave · General 126 + Documents'}</>
               )}
             </div>
             <p style={{ marginTop: '8px' }}>
               {isOfficial
-                ? (step === 1 ? labels.step1Notice : labels.step2Notice)
+                ? (step === 1 ? labels.step1Notice : (step === 2 ? labels.step2Notice : labels.officialStep3Notice))
                 : (step === 1 ? labels.personalStep1Notice : labels.personalStep2Notice)}
             </p>
           </div>
@@ -985,13 +1016,23 @@ export default function RequestModal({
             </button>
             <button
               type="button"
-              className={`wizard-step ${step === 2 ? 'active' : ''}`}
+              className={`wizard-step ${step === 2 ? 'active' : (step > 2 ? 'completed' : '')}`}
               onClick={() => {
                 if (validateStep1()) setStep(2);
               }}
             >
-              <span className="wizard-step-num">2</span>
+              <span className="wizard-step-num">{step > 2 ? '✓' : '2'}</span>
               <span>2. Appendix 16 (උපග්‍රන්ථ 16)</span>
+            </button>
+            <button
+              type="button"
+              className={`wizard-step ${step === 3 ? 'active' : ''}`}
+              onClick={() => {
+                if (validateStep2()) setStep(3);
+              }}
+            >
+              <span className="wizard-step-num">3</span>
+              <span>3. Upload Documents (උපකාරක ලේඛන)</span>
             </button>
           </div>
         )}
@@ -1062,8 +1103,7 @@ export default function RequestModal({
                       value={form.department}
                       onChange={(e) => update('department', e.target.value)}
                       required
-                      className="field-input"
-                      style={{ height: '38px', width: '100%', background: '#fff', fontSize: '12px' }}
+                      className="form-select"
                     >
                       <option value="">{language === 'si' ? '-- දෙපාර්තමේන්තුව / ආයතනය තෝරන්න --' : '-- Select Department / Institution --'}</option>
                       {registeredDepts.map((d) => (
@@ -1074,7 +1114,7 @@ export default function RequestModal({
                     </select>
                   </div>
                   <div className="input-group" style={{ marginBottom: '14px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '10px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(135px, 145px) 1fr', gap: '10px' }}>
                       <div>
                         <label className="input-label" style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '4px' }}>
                           {language === 'si' ? 'ගෞරව නාමය' : 'Title'} *
@@ -1082,7 +1122,7 @@ export default function RequestModal({
                         <select
                           value={form.salutation || 'Mr.'}
                           onChange={(e) => update('salutation', e.target.value)}
-                          style={{ width: '100%', height: '36px', borderRadius: '4px', border: '1px solid #cbd5e1', padding: '0 8px', fontSize: '12px', background: '#fff' }}
+                          className="form-select"
                         >
                           <option value="Mr.">{language === 'si' ? 'Mr. (මයා)' : 'Mr.'}</option>
                           <option value="Mrs.">{language === 'si' ? 'Mrs. (මිය)' : 'Mrs.'}</option>
@@ -1099,7 +1139,7 @@ export default function RequestModal({
                           value={form.fullName}
                           onChange={(e) => update('fullName', e.target.value)}
                           placeholder="e.g., Kankanamge Nimal Perera"
-                          style={{ width: '100%', height: '36px', borderRadius: '4px', border: '1px solid #cbd5e1', padding: '0 10px', fontSize: '12px' }}
+                          style={{ width: '100%', height: '38px', borderRadius: '6px', border: '1.5px solid #cbd5e1', padding: '0 10px', fontSize: '12.5px', boxSizing: 'border-box' }}
                         />
                       </div>
                     </div>
@@ -1774,7 +1814,123 @@ export default function RequestModal({
               </>
             )}
 
-            {isRejected && step === 2 && (
+            {/* ========================================================================= */}
+            {/* FLOW 3: OFFICIAL DUTY STEP 3: UPLOAD DOCUMENTS (APPLICANT)               */}
+            {/* 1. Passport (image/pdf) - not required                                   */}
+            {/* 2. Invitation letter (image/pdf) - not required                           */}
+            {/* 3. Head of department letter (image/pdf) - not required                   */}
+            {/* 4. Applicant request letter (image/pdf) - not required                    */}
+            {/* 5. Other (image/pdf) - not required                                      */}
+            {/* ========================================================================= */}
+            {isOfficial && step === 3 && (
+              <>
+                <div className="step-indicator-banner">
+                  <UploadCloud size={16} />
+                  <span>{labels.officialStep3Notice}</span>
+                </div>
+
+                <div style={{
+                  background: '#f0fdf4',
+                  border: '1.5px solid #86efac',
+                  borderRadius: '10px',
+                  padding: '12px 16px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  color: '#166534',
+                  fontSize: '13px',
+                  fontWeight: 600
+                }}>
+                  <Info size={18} style={{ flexShrink: 0, color: '#16a34a' }} />
+                  <div>
+                    {language === 'si'
+                      ? 'පහත සියලුම ලේඛන විකල්ප (Optional / Not Required) වේ. ඔබට අදාළ ලේඛන තිබේ නම් පමණක් අමුණන්න, නැතහොත් කෙලින්ම අයදුම්පත ඉදිරිපත් කළ හැකිය.'
+                      : 'All 5 documents below are optional (Not Required). Attach only the documents you have available, or proceed straight to submit your application.'}
+                  </div>
+                </div>
+
+                <FormSection
+                  title={labels.docsHeading}
+                  number="PDF"
+                  subtitle={language === 'si' ? 'අයදුම්කරුගේ උපකාරක ලේඛන (විකල්ප - අනිවාර්ය නොවේ)' : 'Applicant Supporting Documents (Optional - Not Required)'}
+                >
+                  <div className="doc-upload-grid span-2">
+                    {/* 1. Passport (image/pdf) not required */}
+                    <FileUploaderCard
+                      title={labels.docPassportTitle}
+                      subtitle={language === 'si' ? 'ගමන් බලපත්‍රයේ ජීව දත්ත පිටපත (විකල්ප - අනිවාර්ය නැත)' : 'Passport Bio Page (PDF / Image - Not Required)'}
+                      docKey="passportImage"
+                      doc={form.documents?.passportImage}
+                      onUpload={handleDocUpload}
+                      onRemove={handleDocRemove}
+                      onPreview={setPreviewDoc}
+                      required={false}
+                      labels={labels}
+                      icon={User}
+                    />
+
+                    {/* 2. Invitation letter (image/pdf) not required */}
+                    <FileUploaderCard
+                      title={labels.docInvitationTitle}
+                      subtitle={language === 'si' ? 'විදේශීය ආයතනයෙන් ලද ආරාධනා පත්‍රය (විකල්ප - අනිවාර්ය නැත)' : 'Official Invitation Letter from host organization (PDF / Image - Not Required)'}
+                      docKey="invitationLetter"
+                      doc={form.documents?.invitationLetter}
+                      onUpload={handleDocUpload}
+                      onRemove={handleDocRemove}
+                      onPreview={setPreviewDoc}
+                      required={false}
+                      labels={labels}
+                      icon={Mail}
+                    />
+
+                    {/* 3. Head of department letter (image/pdf) not required */}
+                    <FileUploaderCard
+                      title={labels.docHeadTitle}
+                      subtitle={language === 'si' ? 'දෙපාර්තමේන්තු ප්‍රධානියාගේ ලිපිය (විකල්ප - අනිවාර්ය නැත)' : 'Head of Department Recommendation Letter (PDF / Image - Not Required)'}
+                      docKey="institutionLetter"
+                      doc={form.documents?.institutionLetter}
+                      onUpload={handleDocUpload}
+                      onRemove={handleDocRemove}
+                      onPreview={setPreviewDoc}
+                      required={false}
+                      labels={labels}
+                      icon={Building}
+                    />
+
+                    {/* 4. Applicant request letter (image/pdf) not required */}
+                    <FileUploaderCard
+                      title={labels.docRequestTitle}
+                      subtitle={language === 'si' ? 'ඉල්ලුම්කරුගේ ලිඛිත ඉල්ලීම් ලිපිය (විකල්ප - අනිවාර්ය නැත)' : 'Applicant Formal Request Letter (PDF / Image - Not Required)'}
+                      docKey="requestLetter"
+                      doc={form.documents?.requestLetter}
+                      onUpload={handleDocUpload}
+                      onRemove={handleDocRemove}
+                      onPreview={setPreviewDoc}
+                      required={false}
+                      labels={labels}
+                      icon={FileText}
+                    />
+
+                    {/* 5. Other (image/pdf) not required */}
+                    <FileUploaderCard
+                      title={labels.docOtherTitle}
+                      subtitle={language === 'si' ? 'වෙනත් අදාළ ලිපි ලේඛන (විකල්ප - අනිවාර්ය නැත)' : 'Other supporting materials or documents (PDF / Image - Not Required)'}
+                      docKey="otherDocuments"
+                      doc={form.documents?.otherDocuments}
+                      onUpload={handleDocUpload}
+                      onRemove={handleDocRemove}
+                      onPreview={setPreviewDoc}
+                      required={false}
+                      labels={labels}
+                      icon={Paperclip}
+                    />
+                  </div>
+                </FormSection>
+              </>
+            )}
+
+            {isRejected && step === (isOfficial ? 3 : 2) && (
               <div style={{
                 marginTop: '16px',
                 background: '#f8fafc',
@@ -1824,7 +1980,7 @@ export default function RequestModal({
               </button>
             )}
 
-            {/* Official Step 2: Back button + Submit button */}
+            {/* Official Step 2: Back button + Next to Docs button */}
             {isOfficial && step === 2 && (
               <>
                 <button
@@ -1839,9 +1995,35 @@ export default function RequestModal({
                   <span>{labels.prevStepBtn}</span>
                 </button>
                 <button
+                  type="button"
+                  className="primary-button"
+                  onClick={goToStep3}
+                  disabled={!signature || !declaration}
+                >
+                  <span>{labels.nextToDocsBtn}</span>
+                  <ArrowRight size={15} />
+                </button>
+              </>
+            )}
+
+            {/* Official Step 3: Back button + Submit button */}
+            {isOfficial && step === 3 && (
+              <>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => {
+                    setError('');
+                    setStep(2);
+                  }}
+                >
+                  <ArrowLeft size={15} />
+                  <span>{labels.backToApp16Btn}</span>
+                </button>
+                <button
                   type="submit"
                   className="primary-button"
-                  disabled={busy || !signature || !declaration}
+                  disabled={busy}
                 >
                   {busy ? '…' : (isEditing ? (isRejected ? (language === 'si' ? 'අඩුපාඩු සකසා නැවත ඉදිරිපත් කරන්න' : 'Resubmit Application with Corrections') : (language === 'si' ? 'වෙනස්කම් සුරකින්න' : 'Save Changes')) : labels.submitOfficialBtn)}
                   <Check size={15} />
@@ -1955,14 +2137,16 @@ function SelectField({ name, label, value, update, placeholder, options }) {
     'No-pay leave',
     'Official duty',
   ];
+  const currentValue = (value === 'Private leave') ? 'Annual / vacation leave' : (value || '');
   return (
     <label className="field-label">
-      {label}
+      <span>{label}</span>
       <select
         name={name}
-        value={value || ''}
+        value={currentValue}
         onChange={(event) => update(name, event.target.value)}
         required
+        className="form-select"
       >
         <option value="">{placeholder}</option>
         {options.map((option, index) => (
@@ -2001,6 +2185,7 @@ export function WorkflowHierarchyStepper({ request, language = 'en' }) {
   if (!request) return null;
 
   const d = request.details || (request.applicant_name ? request : {});
+  const isOfficial = request.leave_type === 'Official duty' || d.leaveType === 'Official duty' || d.leaveCategory === 'Official duty';
   const status = request.status || 'Pending';
   const clearances = Array.isArray(d.secretariatClearances) ? d.secretariatClearances : [];
   const endorsement = d.departmentHeadEndorsement;
@@ -2040,8 +2225,8 @@ export function WorkflowHierarchyStepper({ request, language = 'en' }) {
       id: 'applicant',
       titleEn: 'Applicant',
       titleSi: 'අයදුම්කරු',
-      descEn: 'Submission (Gen 126)',
-      descSi: 'අයදුම්පත යොමු කිරීම',
+      descEn: isOfficial ? 'Submission (Gen 126 & App 16)' : 'Submission (Gen 126)',
+      descSi: isOfficial ? 'පොදු 126 සහ උපග්‍රන්ථ 16' : 'පොදු 126 අයදුම්පත',
       actor: request.applicant_name || d.fullName || 'Applicant',
       date: request.created_at?.slice(0, 10),
       isCompleted: true,
@@ -2734,14 +2919,10 @@ export function ApplicantLiveProcessTracker({
               <select
                 value={activeReq.id}
                 onChange={(e) => onSelectRequestId && onSelectRequestId(Number(e.target.value))}
+                className="form-select form-select-sm"
                 style={{
-                  fontSize: '11.5px',
                   fontWeight: 600,
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  border: '1.5px solid #cbd5e1',
-                  background: '#ffffff',
-                  color: '#0f172a',
+                  maxWidth: '280px',
                   cursor: 'pointer'
                 }}
               >
@@ -3031,6 +3212,28 @@ export function ApplicantLiveProcessTracker({
           <FileDown size={13} />
           <span>{language === 'si' ? 'General 126 PDF' : 'General 126 PDF'}</span>
         </button>
+
+        {isOfficial && (
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => printAppendix16Pdf(activeReq)}
+            style={{
+              height: '30px',
+              padding: '0 10px',
+              fontSize: '11px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              color: '#15803d',
+              borderColor: '#86efac',
+              background: '#f0fdf4'
+            }}
+          >
+            <FileDown size={13} />
+            <span>{language === 'si' ? 'Appendix 16 PDF (උපග්‍රන්ථ 16)' : 'Appendix 16 PDF'}</span>
+          </button>
+        )}
 
         {hasDeptHeadPart && (
           <button
@@ -3618,9 +3821,15 @@ export function RequestDetails({ details = {}, language, request, onPrintOfficer
   if (!hasDetails) return null;
 
   const docs = details.documents || {};
-  const hasUploadedDocs = docs.institutionLetter || docs.passportImage || docs.requestLetter || docs.otherDocuments;
+  const hasUploadedDocs = docs.institutionLetter || docs.passportImage || docs.requestLetter || docs.invitationLetter || docs.otherDocuments;
 
-  const docList = [
+  const docList = isOfficial ? [
+    { key: 'passportImage', title: labels.docPassportTitle, doc: docs.passportImage, req: false },
+    { key: 'invitationLetter', title: labels.docInvitationTitle, doc: docs.invitationLetter, req: false },
+    { key: 'institutionLetter', title: labels.docHeadTitle, doc: docs.institutionLetter, req: false },
+    { key: 'requestLetter', title: labels.docRequestTitle, doc: docs.requestLetter, req: false },
+    { key: 'otherDocuments', title: labels.docOtherTitle, doc: docs.otherDocuments, req: false },
+  ] : [
     { key: 'institutionLetter', title: labels.docHeadTitle, doc: docs.institutionLetter, req: true },
     { key: 'passportImage', title: labels.docPassportTitle, doc: docs.passportImage, req: true },
     { key: 'requestLetter', title: labels.docRequestTitle, doc: docs.requestLetter, req: true },
@@ -3665,28 +3874,54 @@ export function RequestDetails({ details = {}, language, request, onPrintOfficer
             ? (language === 'si' ? '🏛️ නිල සංචාරය · සාමාන්‍ය 126 + උපග්‍රන්ථ 16' : '🏛️ Official Duty · General 126 + Appendix 16')
             : (language === 'si' ? '✈️ පෞද්ගලික නිවාඩු · සාමාන්‍ය 126 + උපකාරක ලේඛන' : '✈️ Personal Leave · General 126 + Documents')}
         </span>
-        <button
-          type="button"
-          className="btn-doc-action"
-          onClick={() => printGeneral126Pdf(request || { details })}
-          title={language === 'si' ? 'සාමාන්‍ය 126 (General 126) පිටුව පමණක් වෙනම PDF ලෙස බාගන්න' : 'Download General 126 Page as Separate PDF'}
-          style={{
-            fontSize: '11px',
-            padding: '3px 10px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '5px',
-            borderRadius: '6px',
-            border: '1px solid #93c5fd',
-            background: '#eff6ff',
-            color: '#1d4ed8',
-            fontWeight: 600,
-            cursor: 'pointer'
-          }}
-        >
-          <FileDown size={12} />
-          <span>{language === 'si' ? 'General 126 PDF බාගන්න' : 'Download General 126 PDF'}</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn-doc-action"
+            onClick={() => printGeneral126Pdf(request || { details })}
+            title={language === 'si' ? 'සාමාන්‍ය 126 (General 126) පිටුව පමණක් වෙනම PDF ලෙස බාගන්න' : 'Download General 126 Page as Separate PDF'}
+            style={{
+              fontSize: '11px',
+              padding: '4px 10px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              borderRadius: '6px',
+              border: '1px solid #93c5fd',
+              background: '#eff6ff',
+              color: '#1d4ed8',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            <FileDown size={12} />
+            <span>{language === 'si' ? 'General 126 PDF' : 'General 126 PDF'}</span>
+          </button>
+          {isOfficial && (
+            <button
+              type="button"
+              className="btn-doc-action"
+              onClick={() => printAppendix16Pdf(request || { details })}
+              title={language === 'si' ? 'උපග්‍රන්ථ 16 (Appendix 16 / Form 16) පිටුව පමණක් වෙනම PDF ලෙස බාගන්න' : 'Download Appendix 16 / Form 16 as Separate PDF'}
+              style={{
+                fontSize: '11px',
+                padding: '4px 10px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                borderRadius: '6px',
+                border: '1px solid #86efac',
+                background: '#f0fdf4',
+                color: '#15803d',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              <FileDown size={12} />
+              <span>{language === 'si' ? 'Appendix 16 (Form 16) PDF' : 'Appendix 16 (Form 16) PDF'}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {groups.map((group) => {
@@ -4869,9 +5104,388 @@ export function printGeneral126Pdf(r) {
   printWin.document.close();
 }
 
+
 if (typeof window !== 'undefined') {
   window.printGeneral126Pdf = printGeneral126Pdf;
 }
+
+// =========================================================================
+// 2.2 APPENDIX 16 (FORM 16) PRIOR PERMISSION PDF
+// =========================================================================
+export function printAppendix16Pdf(r) {
+  if (!r) return;
+  const printWin = window.open('', '_blank');
+  if (!printWin) {
+    alert('Please allow popups in your browser to download/print the PDF.');
+    return;
+  }
+
+  const d = r.details || (r.applicant_name ? r : {});
+  const refNo = r.id ? `FV-${String(r.id).padStart(4, '0')}` : 'FV-REF';
+  const deptEndorsement = d.departmentHeadEndorsement || {};
+  let rawApplicantName = r.applicant_name || d.fullName || '—';
+  let activeSalutation = (deptEndorsement.officerSalutation && deptEndorsement.officerSalutation !== 'Mr./Mrs./Miss')
+    ? deptEndorsement.officerSalutation
+    : (r.applicant_salutation || d.salutation || 'Mr.');
+  const prefixMatch = rawApplicantName.match(/^(Mr\.|Mrs\.|Miss|Ms\.|Dr\.|Prof\.|Eng\.|Rev\.)\s*/i);
+  if (prefixMatch) {
+    activeSalutation = prefixMatch[1];
+    rawApplicantName = rawApplicantName.slice(prefixMatch[0].length).trim();
+  }
+  const applicantName = `${activeSalutation} ${rawApplicantName}`;
+  const nic = d.nic || '—';
+  const dateOfBirth = d.dateOfBirth || '—';
+  const designation = d.designation || '—';
+  const grade = d.grade || '';
+  const service = d.service || '—';
+  const firstApptDate = d.firstAppointmentDate || '—';
+  const department = d.department || r.department_name || '—';
+  const ministry = d.ministry || deptEndorsement.ministryName || 'Ministry of Public Administration';
+
+  const dutyCoverName = d.dutyCoverName || '—';
+  const dutyCoverDesignation = d.dutyCoverDesignation || '—';
+
+  const purpose = r.purpose || d.purpose || '—';
+  const trainingField = d.trainingField || purpose;
+  const destination = r.destination || d.destination || '—';
+  const startDate = r.start_date || d.startDate || '—';
+  const endDate = r.end_date || d.endDate || '—';
+  const daysApplied = d.daysApplied || (startDate && endDate && startDate !== '—' && endDate !== '—' ? `${Math.max(1, Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1)}` : '—');
+  const visitInstitution = d.visitInstitution || '—';
+  const courseStartDate = d.courseStartDate || startDate;
+  const courseEndDate = d.courseEndDate || endDate;
+  const prevTripReportSubmitted = d.prevTripReportSubmitted || 'N/A';
+
+  const airfareFunding = d.airfareFunding || 'Government of Sri Lanka (GOSL)';
+  const maintenanceFunding = d.maintenanceFunding || 'Daily Subsistence Allowance (DSA)';
+  const fundingSource = d.fundingSource || 'Government Funds';
+
+  const travelHistory = Array.isArray(d.travelHistory) ? d.travelHistory : [];
+  const appDate = d.applicationDate || r.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10);
+  const signature = r.signature || d.signature;
+
+  // Department Head Endorsement
+  const hasDeptEndorsement = Boolean(deptEndorsement.signature || deptEndorsement.myNo);
+  const deptHeadName = deptEndorsement.completedBy?.name || deptEndorsement.signatoryName || 'Head of Department';
+  const deptHeadDesig = deptEndorsement.completedBy?.designation || deptEndorsement.signatoryDesignation || 'Head of Department / Institution';
+  const deptHeadSig = deptEndorsement.signature;
+  const deptHeadDate = deptEndorsement.date || deptEndorsement.endorsementDate || '';
+
+  const travelHistoryRows = travelHistory.length > 0
+    ? travelHistory.map((row, idx) => `
+        <tr>
+          <td style="text-align: center;">${idx + 1}</td>
+          <td>${row.year || '—'}</td>
+          <td>${row.purpose || '—'}</td>
+          <td>${row.period || '—'}</td>
+          <td>${row.country || '—'}</td>
+        </tr>
+      `).join('')
+    : `<tr><td colspan="5" style="text-align: center; color: #64748b; font-style: italic; padding: 10px;">No foreign visits recorded in previous 3 years / පෙර සංචාර නොමැත</td></tr>`;
+
+  printWin.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Appendix 16 Prior Permission - ${refNo} - ${applicantName}</title>
+        <style>
+          * { box-sizing: border-box; }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            color: #0f172a;
+            background: #f8fafc;
+            margin: 0;
+            padding: 24px;
+            line-height: 1.45;
+            font-size: 11px;
+          }
+          .no-print-toolbar {
+            max-width: 840px;
+            margin: 0 auto 18px auto;
+            background: #0f172a;
+            color: #f8fafc;
+            padding: 10px 18px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+          }
+          .btn-print {
+            background: #15803d;
+            color: #fff;
+            border: none;
+            padding: 7px 16px;
+            border-radius: 6px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 11.5px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+          }
+          .btn-close {
+            background: #334155;
+            color: #fff;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+          }
+          .sheet {
+            max-width: 840px;
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+            padding: 28px 34px;
+            border-radius: 8px;
+          }
+          .header-box {
+            text-align: center;
+            border-bottom: 2px solid #0f172a;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+          }
+          .header-box h2 {
+            margin: 0 0 3px 0;
+            font-size: 11px;
+            font-weight: 700;
+            color: #475569;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+          }
+          .header-box h1 {
+            margin: 2px 0;
+            font-size: 14.5px;
+            font-weight: 800;
+            color: #0f172a;
+            text-transform: uppercase;
+          }
+          .header-box .sub-title {
+            font-size: 11.5px;
+            font-weight: 700;
+            color: #1e3a8a;
+            margin-top: 3px;
+          }
+          .ref-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            padding: 6px 12px;
+            border-radius: 4px;
+            margin-bottom: 14px;
+            font-size: 11px;
+          }
+          .part-title {
+            background: #f1f5f9;
+            border-left: 3.5px solid #1e3a8a;
+            padding: 5px 10px;
+            font-size: 11.5px;
+            font-weight: 700;
+            color: #0f172a;
+            margin: 14px 0 8px 0;
+            text-transform: uppercase;
+          }
+          table.data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+            font-size: 11px;
+          }
+          table.data-table th, table.data-table td {
+            border: 1px solid #cbd5e1;
+            padding: 5.5px 8px;
+            vertical-align: top;
+          }
+          table.data-table th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #334155;
+            text-align: left;
+          }
+          .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px 14px;
+            margin-bottom: 10px;
+          }
+          .item {
+            border-bottom: 1px dotted #cbd5e1;
+            padding-bottom: 4px;
+          }
+          .item .lbl {
+            display: block;
+            font-size: 9.5px;
+            color: #64748b;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 1px;
+          }
+          .item .val {
+            font-size: 11.5px;
+            color: #0f172a;
+            font-weight: 700;
+          }
+          .sig-row {
+            margin-top: 18px;
+            padding-top: 10px;
+            border-top: 1px dashed #cbd5e1;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+          }
+          .sig-box {
+            text-align: center;
+            width: 240px;
+          }
+          .sig-img {
+            max-height: 48px;
+            max-width: 200px;
+            display: block;
+            margin: 0 auto 4px auto;
+          }
+          .sig-line {
+            border-top: 1px dotted #0f172a;
+            padding-top: 4px;
+            font-size: 10px;
+            color: #475569;
+          }
+          @media print {
+            .no-print-toolbar { display: none !important; }
+            body { padding: 0; background: #fff; }
+            .sheet { max-width: 100%; border: none; box-shadow: none; padding: 10mm 14mm; }
+            @page { size: A4 portrait; margin: 8mm; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="no-print-toolbar">
+          <div>
+            <strong>Sri Lanka Foreign Visits Portal · Appendix 16 (උපග්‍රන්ථ 16)</strong>
+            <span style="font-size: 11px; color: #94a3b8; margin-left: 8px;">Official Prior Permission Form · Ref: ${refNo}</span>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn-print" onclick="window.print()">
+              🖨️ මුද්‍රණය / PDF සුරකින්න (Print / Save as PDF)
+            </button>
+            <button class="btn-close" onclick="window.close()">වසන්න (Close)</button>
+          </div>
+        </div>
+
+        <div class="sheet">
+          <div class="header-box">
+            <h2>Democratic Socialist Republic of Sri Lanka · Establishments Code</h2>
+            <h1>Appendix 16 (උපග්‍රන්ථ 16) · Form 16</h1>
+            <div class="sub-title">Application for Prior Permission for Official Travel Abroad / රාජ්‍ය නිලධාරීන්ගේ නිල විදේශ සංචාර සඳහා පූර්ව අවසරය ලබාගැනීමේ අයදුම්පත</div>
+          </div>
+
+          <div class="ref-bar">
+            <div><strong>Application Ref:</strong> <span style="color: #1e3a8a; font-weight: 800;">${refNo}</span></div>
+            <div><strong>Nature of Travel:</strong> Official Duty (නිල රාජකාරි)</div>
+            <div><strong>Date:</strong> ${appDate}</div>
+          </div>
+
+          <div class="part-title">1. Particulars of the Officer (නිලධාරියා පිළිබඳ තොරතුරු)</div>
+          <div class="grid-2">
+            <div class="item"><span class="lbl">1.1 Full Name (සම්පූර්ණ නම)</span><span class="val">${applicantName}</span></div>
+            <div class="item"><span class="lbl">1.2 National Identity Card No. (ජා.හැ. අංකය)</span><span class="val">${nic}</span></div>
+            <div class="item"><span class="lbl">1.3 Date of Birth (උපන් දිනය)</span><span class="val">${dateOfBirth}</span></div>
+            <div class="item"><span class="lbl">1.4 Post & Grade (තනතුර සහ ශ්‍රේණිය)</span><span class="val">${designation} ${grade ? '(' + grade + ')' : ''}</span></div>
+            <div class="item"><span class="lbl">1.5 Service to which belongs (අයත් සේවය)</span><span class="val">${service}</span></div>
+            <div class="item"><span class="lbl">1.6 Date of First Appointment (මුල් පත්වීම් දිනය)</span><span class="val">${firstApptDate}</span></div>
+            <div class="item"><span class="lbl">1.7 Department / Institution (දෙපාර්තමේන්තුව / ආයතනය)</span><span class="val">${department}</span></div>
+            <div class="item"><span class="lbl">1.8 Ministry / Provincial Council (අමාත්‍යාංශය)</span><span class="val">${ministry}</span></div>
+          </div>
+
+          <div class="part-title">2. Acting / Duty Covering Arrangements (වැඩ බැලීමේ විධිවිධාන)</div>
+          <div class="grid-2">
+            <div class="item"><span class="lbl">2.1 Name of Covering Officer (වැඩ ආවරණය කරන නිලධාරියාගේ නම)</span><span class="val">${dutyCoverName}</span></div>
+            <div class="item"><span class="lbl">2.2 Designation of Covering Officer (වැඩ ආවරණය කරන නිලධාරියාගේ තනතුර)</span><span class="val">${dutyCoverDesignation}</span></div>
+          </div>
+
+          <div class="part-title">3. Details of Official Visit / Training (නිල සංචාරයේ / පුහුණුවේ විස්තර)</div>
+          <div class="grid-2">
+            <div class="item" style="grid-column: span 2;"><span class="lbl">3.1 Purpose of Visit / Field of Training (සංචාරයේ අරමුණ / පුහුණු ක්ෂේත්‍රය)</span><span class="val">${trainingField}</span></div>
+            <div class="item"><span class="lbl">3.2 Destination Country & City (ගමනාන්ත රට සහ නගරය)</span><span class="val">${destination}</span></div>
+            <div class="item"><span class="lbl">3.3 Period of Visit & Days (කාලසීමාව සහ දින ගණන)</span><span class="val">${startDate} to ${endDate} (${daysApplied} Days)</span></div>
+            <div class="item"><span class="lbl">3.4 Sponsoring Agency / Host (අනුග්‍රාහක / ආරාධිත ආයතනය)</span><span class="val">${visitInstitution}</span></div>
+            <div class="item"><span class="lbl">3.5 Course / Programme Dates (වැඩසටහන් දින)</span><span class="val">${courseStartDate} to ${courseEndDate}</span></div>
+            <div class="item" style="grid-column: span 2;"><span class="lbl">3.6 Previous Official Tour Report Submitted? (පෙර සංචාර වාර්තාව ඉදිරිපත් කර තිබේද?)</span><span class="val">${prevTripReportSubmitted}</span></div>
+          </div>
+
+          <div class="part-title">4. Expenditure & Financial Allocations (වියදම් පියවාගැනීම සහ ප්‍රතිපාදන)</div>
+          <div class="grid-2">
+            <div class="item"><span class="lbl">4.1 Airfare Funding (ගුවන් ගමන් වියදම්)</span><span class="val">${airfareFunding}</span></div>
+            <div class="item"><span class="lbl">4.2 Maintenance Abroad / Subsistence (නඩත්තු / දීමනා වියදම්)</span><span class="val">${maintenanceFunding}</span></div>
+            <div class="item" style="grid-column: span 2;"><span class="lbl">4.3 Funding Source / Government Vote (ශ්‍රී ලංකා රජයේ වැය ශීර්ෂය / මූලාශ්‍රය)</span><span class="val">${fundingSource}</span></div>
+          </div>
+
+          <div class="part-title">5. Foreign Visits During Current Year and Preceding Three Years (පසුගිය වසර 3 තුළ විදේශ සංචාර)</div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 35px; text-align: center;">#</th>
+                <th style="width: 80px;">Year (වර්ෂය)</th>
+                <th>Purpose (අරමුණ)</th>
+                <th style="width: 140px;">Period (කාලසීමාව)</th>
+                <th style="width: 120px;">Country (රට)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${travelHistoryRows}
+            </tbody>
+          </table>
+
+          <div class="part-title">6. Certification by the Applicant (අයදුම්කරුගේ සහතිකය)</div>
+          <p style="margin: 4px 0 10px 0; font-size: 10.5px; color: #334155; line-height: 1.5;">
+            I hereby certify that the particulars furnished above are true and accurate. I undertake to submit a report on the official travel within one month of return to Sri Lanka in terms of Establishments Code Chapter XV Section 10:1.<br />
+            <em>ඉහත සඳහන් තොරතුරු සත්‍ය හා නිවැරදි බවට මෙයින් සහතික වන අතර ආපසු පැමිණ මාසයක් ඇතුළත සංචාරක වාර්තාවක් ඉදිරිපත් කිරීමට එකඟ වෙමි.</em>
+          </p>
+
+          <div class="sig-row">
+            <div>
+              <div style="font-size: 11px;"><strong>Date (දිනය):</strong> ${appDate}</div>
+              <div style="font-size: 10.5px; color: #64748b; margin-top: 2px;">Applicant: ${applicantName}</div>
+            </div>
+            <div class="sig-box">
+              ${signature ? `<img src="${signature}" class="sig-img" alt="Applicant Signature" />` : '<div style="height: 38px;"></div>'}
+              <div class="sig-line">Signature of Applicant / අයදුම්කරුගේ අත්සන</div>
+            </div>
+          </div>
+
+          ${hasDeptEndorsement ? `
+            <div class="part-title" style="margin-top: 16px;">7. Head of Department Recommendation (දෙපාර්තමේන්තු ප්‍රධානියාගේ නිර්දේශය)</div>
+            <p style="margin: 4px 0 8px 0; font-size: 10.5px; color: #334155;">
+              I certify that acting arrangements have been made and that no disciplinary inquiry is pending or contemplated against this officer. The official travel is recommended.<br />
+              <em>වැඩ ආවරණ විධිවිධාන යොදා ඇති බවත් කිසිදු විනය පරීක්ෂණයක් නොමැති බවත් සහතික කර නිර්දේශ කරමි.</em>
+            </p>
+            <div class="sig-row" style="margin-top: 10px;">
+              <div>
+                <div style="font-size: 11px;"><strong>Date (දිනය):</strong> ${deptHeadDate || appDate}</div>
+                <div style="font-size: 10.5px; color: #64748b; margin-top: 2px;">Head of Dept: ${deptHeadName}</div>
+              </div>
+              <div class="sig-box">
+                ${deptHeadSig ? `<img src="${deptHeadSig}" class="sig-img" alt="Dept Head Signature" />` : '<div style="height: 38px;"></div>'}
+                <div class="sig-line">${deptHeadName}<br /><span style="font-size: 9.5px; color: #64748b;">${deptHeadDesig}</span></div>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      </body>
+    </html>
+  `);
+  printWin.document.close();
+}
+
+if (typeof window !== 'undefined') {
+  window.printAppendix16Pdf = printAppendix16Pdf;
+}
+
 
 // =========================================================================
 // 3. NOTE SHEET & MINISTERIAL SUBMISSION PDF (සටහන් පත්‍රිකාව හා අමාත්‍ය ඉදිරිපත් කිරීම)
@@ -7646,7 +8260,8 @@ export function DepartmentHeadEndorsementSection({ request, user, language = 'en
               <select
                 value={officerSalutation}
                 onChange={(e) => setOfficerSalutation(e.target.value)}
-                style={{ height: '28px', padding: '0 8px', fontSize: '11px', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff' }}
+                className="form-select form-select-sm"
+                style={{ width: 'auto', minWidth: '135px' }}
               >
                 <option value="Mr.">{language === 'si' ? 'Mr. (මයා)' : 'Mr.'}</option>
                 <option value="Mrs.">{language === 'si' ? 'Mrs. (මිය)' : 'Mrs.'}</option>
@@ -9473,10 +10088,11 @@ export function ApplicationZipPackageCard({ request, token, language = 'en' }) {
   const refNo = `FV-${String(request.id).padStart(4, '0')}`;
   const docs = d.documents || {};
   const applicantDocsList = [
-    { key: 'institutionLetter', name: docs.institutionLetter?.name || 'Head of Institution Letter', doc: docs.institutionLetter, titleEn: '1. Head of Institution Recommendation Letter', titleSi: '1. ආයතන ප්‍රධානී නිර්දේශ ලිපිය' },
-    { key: 'passportImage', name: docs.passportImage?.name || 'Passport Bio Page', doc: docs.passportImage, titleEn: '2. Passport Bio-Data Page', titleSi: '2. විදේශ ගමන් බලපත්‍රයේ පිටපත' },
-    { key: 'requestLetter', name: docs.requestLetter?.name || 'Applicant Request Letter', doc: docs.requestLetter, titleEn: '3. Applicant Formal Request Letter', titleSi: '3. අයදුම්කරුගේ ලිඛිත ඉල්ලීම් ලිපිය' },
-    { key: 'otherDocuments', name: docs.otherDocuments?.name || 'Other Supporting Document', doc: docs.otherDocuments, titleEn: '4. Other Supporting Documents', titleSi: '4. වෙනත් අදාළ උපකාරක ලේඛන' },
+    { key: 'passportImage', name: docs.passportImage?.name || 'Passport Bio Page', doc: docs.passportImage, titleEn: '1. Passport Bio-Data Page', titleSi: '1. විදේශ ගමන් බලපත්‍රයේ පිටපත' },
+    { key: 'invitationLetter', name: docs.invitationLetter?.name || 'Official Invitation Letter', doc: docs.invitationLetter, titleEn: '2. Official Invitation Letter', titleSi: '2. නිල ආරාධනා ලිපිය' },
+    { key: 'institutionLetter', name: docs.institutionLetter?.name || 'Head of Institution / Department Letter', doc: docs.institutionLetter, titleEn: '3. Head of Department Recommendation Letter', titleSi: '3. දෙපාර්තමේන්තු / ආයතන ප්‍රධානී නිර්දේශ ලිපිය' },
+    { key: 'requestLetter', name: docs.requestLetter?.name || 'Applicant Request Letter', doc: docs.requestLetter, titleEn: '4. Applicant Formal Request Letter', titleSi: '4. අයදුම්කරුගේ ලිඛිත ඉල්ලීම් ලිපිය' },
+    { key: 'otherDocuments', name: docs.otherDocuments?.name || 'Other Supporting Document', doc: docs.otherDocuments, titleEn: '5. Other Supporting Documents', titleSi: '5. වෙනත් අදාළ උපකාරක ලේඛන' },
   ].filter(item => item.doc);
 
   const clearances = Array.isArray(d.clearances) ? d.clearances : [];
@@ -9493,7 +10109,9 @@ export function ApplicationZipPackageCard({ request, token, language = 'en' }) {
   const hasClearanceCompleted = Boolean(clearances.length > 0 && clearances.some(c => c.signature || c.decision));
   const hasNoteSheetCompleted = Boolean(d.officerCompleted && (d.noteSheet || d.officerRemarks || d.officerAssessment));
 
-  const completedDocsCount = 1 +
+  const isOfficial = request.leave_type === 'Official duty' || d.leaveType === 'Official duty' || d.leaveCategory === 'Official duty';
+  const totalPossible = isOfficial ? 8 : 7;
+  const completedDocsCount = 1 + (isOfficial ? 1 : 0) +
     (hasOfficeUseCompleted ? 1 : 0) +
     (hasDeptHeadCompleted ? 1 : 0) +
     (hasSecretaryCompleted ? 1 : 0) +
@@ -9557,7 +10175,7 @@ export function ApplicationZipPackageCard({ request, token, language = 'en' }) {
                 padding: '2px 8px',
                 borderRadius: '4px'
               }}>
-                {completedDocsCount} / 7 Documents Ready (PDF)
+                {completedDocsCount} / {totalPossible} Documents Ready (PDF)
               </span>
             </div>
             <p style={{ margin: '3px 0 0 0', fontSize: '11.5px', color: '#64748b' }}>
@@ -9627,7 +10245,7 @@ export function ApplicationZipPackageCard({ request, token, language = 'en' }) {
                 {language === 'si' ? 'සාමාන්‍ය 126 PDF (General 126 PDF)' : 'General 126 PDF'}
               </strong>
               <span style={{ fontSize: '10.5px', color: '#64748b' }}>
-                Est. Code Ch. XII Sec. 1:4 & App. 16
+                Est. Code Ch. XII Sec. 1:4
               </span>
             </div>
           </div>
@@ -9641,6 +10259,32 @@ export function ApplicationZipPackageCard({ request, token, language = 'en' }) {
             <span>{language === 'si' ? 'PDF බලන්න' : 'View PDF'}</span>
           </button>
         </div>
+
+        {/* Item 1.2: Appendix 16 (Form 16) - Shown when Official Duty */}
+        {isOfficial && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#f0fdf4', border: '1px solid #86efac', color: '#15803d', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 800, flexShrink: 0 }}>16</span>
+              <div>
+                <strong style={{ fontSize: '12px', color: '#0f172a', display: 'block' }}>
+                  {language === 'si' ? 'උපග්‍රන්ථ 16 PDF (Appendix 16 / Form 16)' : 'Appendix 16 (Form 16) PDF'}
+                </strong>
+                <span style={{ fontSize: '10.5px', color: '#64748b' }}>
+                  Est. Code Ch. XV 10:1 Prior Permission Form
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => printAppendix16Pdf(request)}
+              style={{ height: '26px', padding: '0 8px', fontSize: '10.5px', display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#15803d', borderColor: '#86efac', background: '#f0fdf4', flexShrink: 0 }}
+            >
+              <FileDown size={12} />
+              <span>{language === 'si' ? 'PDF බලන්න' : 'View PDF'}</span>
+            </button>
+          </div>
+        )}
 
         {/* Item 2 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px' }}>

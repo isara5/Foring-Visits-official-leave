@@ -873,9 +873,16 @@ function App() {
             <div><strong>Application Ref:</strong> FV-${String(r.id).padStart(4, '0')}</div>
             <div><strong>Leave Nature:</strong> ${r.leave_type}</div>
             <div><strong>Status:</strong> ${r.status}</div>
-            <button class="no-print" onclick="window.opener && window.opener.printGeneral126Pdf ? window.opener.printGeneral126Pdf(${JSON.stringify(r).replace(/"/g, '&quot;')}) : window.print()" style="font-size: 9.5px; background: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-weight: 600;">
-              📄 General 126 පමණක් වෙනම PDF බාගන්න
-            </button>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <button class="no-print" onclick="window.opener && window.opener.printGeneral126Pdf ? window.opener.printGeneral126Pdf(${JSON.stringify(r).replace(/"/g, '&quot;')}) : window.print()" style="font-size: 9.5px; background: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-weight: 600;">
+                📄 General 126 PDF
+              </button>
+              ${isOfficial ? `
+                <button class="no-print" onclick="window.opener && window.opener.printAppendix16Pdf ? window.opener.printAppendix16Pdf(${JSON.stringify(r).replace(/"/g, '&quot;')}) : (window.printAppendix16Pdf ? window.printAppendix16Pdf(${JSON.stringify(r).replace(/"/g, '&quot;')}) : window.print())" style="font-size: 9.5px; background: #f0fdf4; color: #15803d; border: 1px solid #86efac; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-weight: 600;">
+                  📄 Appendix 16 PDF
+                </button>
+              ` : ''}
+            </div>
           </div>
           <div class="sec-title">1. Officer and Service Particulars (General 126)</div>
           <div class="grid">
@@ -898,7 +905,7 @@ function App() {
             <div class="item" style="grid-column: span 2"><span>Address While on Leave</span><strong>${d.abroadAddress || '—'} | Tel: ${d.abroadPhone || '—'} | ${d.abroadEmail || ''}</strong></div>
           </div>
           ${isOfficial ? `
-            <div class="sec-title">3. Official Travel & Prior Permission Particulars (Appendix 16 Part 1)</div>
+            <div class="sec-title">3. Official Travel & Prior Permission Particulars (Appendix 16 / Form 16)</div>
             <div class="grid">
               <div class="item"><span>National Identity Card (NIC)</span><strong>${d.nic || '—'}</strong></div>
               <div class="item"><span>Date of Birth</span><strong>${d.dateOfBirth || '—'}</strong></div>
@@ -909,6 +916,31 @@ function App() {
               <div class="item"><span>Funding Method</span><strong>${d.fundingSource || '—'}</strong></div>
               <div class="item"><span>Previous Official Report Submitted</span><strong>${d.prevTripReportSubmitted || '—'}</strong></div>
             </div>
+            ${d.travelHistory && d.travelHistory.length > 0 ? `
+              <div style="margin-top: 10px;">
+                <span style="font-size: 9.5px; font-weight: 700; color: #475569; text-transform: uppercase;">Foreign Visits in Previous 3 Years (Appendix 16 Section 5)</span>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 10px;">
+                  <thead>
+                    <tr style="background: #f8fafc;">
+                      <th style="border: 1px solid #cbd5e1; padding: 4px; text-align: left;">Year</th>
+                      <th style="border: 1px solid #cbd5e1; padding: 4px; text-align: left;">Purpose</th>
+                      <th style="border: 1px solid #cbd5e1; padding: 4px; text-align: left;">Period</th>
+                      <th style="border: 1px solid #cbd5e1; padding: 4px; text-align: left;">Country</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${d.travelHistory.map(th => `
+                      <tr>
+                        <td style="border: 1px solid #cbd5e1; padding: 4px;">${th.year || '—'}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 4px;">${th.purpose || '—'}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 4px;">${th.period || '—'}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 4px;">${th.country || '—'}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            ` : ''}
           ` : ''}
           <div class="sig-section">
             <div>
@@ -2378,12 +2410,13 @@ function App() {
                   <p className="panel-desc">{t.addNewUserDesc}</p>
 
                   <form className="user-form" onSubmit={handleAddUser}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '10px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(135px, 145px) 1fr', gap: '10px' }}>
                       <label className="field-label">
-                        {language === 'si' ? 'ගෞරව නාමය' : 'Title'} *
+                        <span>{language === 'si' ? 'ගෞරව නාමය' : 'Title'} *</span>
                         <select
                           value={newUserSalutation}
                           onChange={(e) => setNewUserSalutation(e.target.value)}
+                          className="form-select"
                         >
                           <option value="Mr.">{language === 'si' ? 'Mr. (මයා)' : 'Mr.'}</option>
                           <option value="Mrs.">{language === 'si' ? 'Mrs. (මිය)' : 'Mrs.'}</option>
@@ -2414,9 +2447,10 @@ function App() {
                     </label>
 
                     <label className="field-label">
-                      {t.designatedRole} *
+                      <span>{t.designatedRole} *</span>
                       <select
                         value={newUserRole}
+                        className="form-select"
                         onChange={(e) => {
                           const r = e.target.value;
                           setNewUserRole(r);
@@ -3237,13 +3271,13 @@ function AuthPage({ language, setLanguage, t, onLogin }) {
               </div>
 
               <form onSubmit={handleRegister}>
-                <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(135px, 145px) 1fr', gap: '10px' }}>
                   <label className="field-label">
-                    {language === 'si' ? 'ගෞරව නාමය' : 'Title'} *
+                    <span>{language === 'si' ? 'ගෞරව නාමය' : 'Title'} *</span>
                     <select
                       value={regSalutation}
                       onChange={(e) => setRegSalutation(e.target.value)}
-                      style={{ height: '38px', borderRadius: '6px', border: '1px solid #cbd5e1', padding: '0 8px', fontSize: '13px', background: '#fff' }}
+                      className="form-select"
                     >
                       <option value="Mr.">{language === 'si' ? 'Mr. (මයා)' : 'Mr.'}</option>
                       <option value="Mrs.">{language === 'si' ? 'Mrs. (මිය)' : 'Mrs.'}</option>
@@ -3864,6 +3898,12 @@ function LeaveTypeQuestionModal({ language, t, onClose, onSelect }) {
                 <div className="card-desc-si">
                   රාජ්‍ය නිල රාජකාරි, අන්තර්ජාතික සමුළු, ද්විපාර්ශ්වික සාකච්ඡා, වැඩමුළු හෝ නිල පුහුණු වැඩසටහන්.
                 </div>
+                <div style={{ marginTop: '8px', padding: '6px 10px', background: 'rgba(30, 58, 138, 0.08)', borderRadius: '6px', fontSize: '11px', color: '#1e3a8a', fontWeight: 600 }}>
+                  📝 පියවර 3 කින් සමන්විතයි: 1. General 126 ➔ 2. Appendix 16 ➔ 3. Upload Documents (ලේඛන ඇමිණීම - විකල්ප).<br />
+                  <span style={{ fontSize: '10px', fontWeight: 500, color: '#475569' }}>
+                    අනුමත කිරීමේ ධුරාවලිය: පෞද්ගලික නිවාඩු හා සමාන 9-අදියර නිල ධුරාවලිය (Same 9-stage hierarchy).
+                  </span>
+                </div>
               </div>
 
               <div className="card-action-arrow">
@@ -3889,6 +3929,12 @@ function LeaveTypeQuestionModal({ language, t, onClose, onSelect }) {
                 </div>
                 <div className="card-desc-si">
                   වාර්ෂික විවේක නිවාඩු, පෞද්ගලික විදේශ සංචාර, පවුලේ අවශ්‍යතා හෝ පෞද්ගලික අධ්‍යයන කටයුතු.
+                </div>
+                <div style={{ marginTop: '8px', padding: '6px 10px', background: 'rgba(3, 105, 161, 0.08)', borderRadius: '6px', fontSize: '11px', color: '#0369a1', fontWeight: 600 }}>
+                  📝 General 126 අයදුම්පත පමණක් සම්පූර්ණ කළ යුතුය.<br />
+                  <span style={{ fontSize: '10px', fontWeight: 500, color: '#475569' }}>
+                    අනුමත කිරීමේ ධුරාවලිය: අදියර 9 ක නිල ධුරාවලිය (Same 9-stage hierarchy).
+                  </span>
                 </div>
               </div>
 
