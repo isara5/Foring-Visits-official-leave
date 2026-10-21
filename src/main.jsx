@@ -3420,13 +3420,122 @@ function DetailModal({
   return (
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="detail-modal" style={{ width: 'min(880px, 100%)', maxHeight: '92vh', overflowY: 'auto' }}>
-        <header className="modal-header">
-          <div>
-            <div className="eyebrow">FV-{String(request.id).padStart(4, '0')} · {t.request}</div>
-            <h2>{request.destination}</h2>
-            <p>{request.applicant_name} · {request.applicant_email}</p>
+        <header className="modal-header" style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'stretch', padding: '18px 24px 14px' }}>
+          {/* Top Row: Title & Metadata on Left, Management Actions (Edit, Delete, Reject) + Close (X) on Right */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', width: '100%' }}>
+            <div>
+              <div className="eyebrow">FV-{String(request.id).padStart(4, '0')} · {t.request}</div>
+              <h2 style={{ margin: '4px 0 2px', fontSize: '18px', fontWeight: 700 }}>{request.destination}</h2>
+              <p style={{ margin: 0, fontSize: '11px', color: '#64748b' }}>{request.applicant_name} · {request.applicant_email}</p>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+              {/* Edit / Resubmit Button */}
+              {canEdit && onEdit && (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => onEdit(request)}
+                  title={language === 'si' ? (request.status === 'Rejected' ? 'අඩුපාඩු සකසා නැවත ඉදිරිපත් කරන්න' : 'අයදුම්පත සංස්කරණය කරන්න') : (request.status === 'Rejected' ? 'Fix Deficiencies & Resubmit' : 'Edit Application')}
+                  style={{
+                    minHeight: '32px',
+                    height: 'auto',
+                    padding: '5px 12px',
+                    fontSize: '11px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    lineHeight: '1.2',
+                    boxSizing: 'border-box',
+                    borderColor: request.status === 'Rejected' ? '#f87171' : '#93c5fd',
+                    background: request.status === 'Rejected' ? '#fef2f2' : '#eff6ff',
+                    color: request.status === 'Rejected' ? '#b91c1c' : '#1d4ed8',
+                    fontWeight: 700
+                  }}
+                >
+                  <Edit3 size={13} />
+                  <span>{language === 'si' ? (request.status === 'Rejected' ? 'අඩුපාඩු සකසා නැවත ඉදිරිපත් කරන්න (Resubmit)' : 'සංස්කරණය (Edit)') : (request.status === 'Rejected' ? 'Fix & Resubmit' : 'Edit')}</span>
+                </button>
+              )}
+
+              {/* Delete Button */}
+              {canDelete && onDelete && (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => onDelete(request)}
+                  title={language === 'si' ? 'අයදුම්පත මකා දමන්න' : 'Delete Application'}
+                  style={{
+                    minHeight: '32px',
+                    height: 'auto',
+                    padding: '5px 12px',
+                    fontSize: '11px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    lineHeight: '1.2',
+                    boxSizing: 'border-box',
+                    borderColor: '#fca5a5',
+                    background: '#fef2f2',
+                    color: '#dc2626',
+                    fontWeight: 600
+                  }}
+                >
+                  <Trash2 size={13} />
+                  <span>{language === 'si' ? 'මකා දමන්න (Delete)' : 'Delete'}</span>
+                </button>
+              )}
+
+              {/* Reject Button */}
+              {canReject && onReject && (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => onReject(request)}
+                  title={language === 'si' ? 'අයදුම්පත ප්‍රතික්ෂේප කරන්න' : 'Reject Application'}
+                  style={{
+                    minHeight: '32px',
+                    height: 'auto',
+                    padding: '5px 12px',
+                    fontSize: '11px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    lineHeight: '1.2',
+                    boxSizing: 'border-box',
+                    borderColor: '#fca5a5',
+                    background: '#fee2e2',
+                    color: '#b91c1c',
+                    fontWeight: 700
+                  }}
+                >
+                  <AlertCircle size={13} />
+                  <span>{language === 'si' ? 'ප්‍රතික්ෂේප කරන්න (Reject)' : 'Reject'}</span>
+                </button>
+              )}
+
+              <button className="icon-button" onClick={onClose} aria-label={t.close} style={{ padding: '6px', marginLeft: '4px' }}>
+                <X size={19} />
+              </button>
+            </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+
+          {/* Action Row: Dedicated Full-Width Horizontal Toolbar for Document PDF Downloads & ZIP */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '8px',
+            width: '100%',
+            paddingTop: '10px',
+            borderTop: '1px solid #f1f5f9'
+          }}>
             {/* Direct Download ZIP Archive (FV-XXXX.zip) */}
             <button
               type="button"
@@ -3434,12 +3543,17 @@ function DetailModal({
               onClick={() => downloadApplicationZip(request, token)}
               title={language === 'si' ? `සම්පූර්ණ ලේඛන 7ම අඩංගු ZIP ගොනුව බාගන්න (FV-${String(request.id).padStart(4, '0')}.zip)` : `Download Complete 7-Document ZIP Package (FV-${String(request.id).padStart(4, '0')}.zip)`}
               style={{
-                height: '32px',
-                padding: '0 12px',
+                minHeight: '32px',
+                height: 'auto',
+                padding: '5px 12px',
                 fontSize: '11px',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                lineHeight: '1.2',
+                boxSizing: 'border-box',
                 background: '#1e3a8a',
                 borderColor: '#172554',
                 color: '#ffffff',
@@ -3457,24 +3571,42 @@ function DetailModal({
                 className="secondary-button"
                 onClick={() => onPrintApplication(request)}
                 title={language === 'si' ? 'සම්පූර්ණ අයදුම්පත PDF ලෙස බාගන්න / මුද්‍රණය කරන්න' : 'Download / Print Full Application PDF'}
-                style={{ height: '32px', padding: '0 12px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                style={{
+                  minHeight: '32px',
+                  height: 'auto',
+                  padding: '5px 12px',
+                  fontSize: '11px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  lineHeight: '1.2',
+                  boxSizing: 'border-box'
+                }}
               >
                 <FileDown size={14} />
                 <span>{language === 'si' ? 'සම්පූර්ණ PDF' : 'Full PDF'}</span>
               </button>
             )}
+
             <button
               type="button"
               className="secondary-button"
               onClick={() => printGeneral126Pdf(request)}
               title={language === 'si' ? 'General 126 (පුද්ගලික පිටුව) වෙනම PDF ලෙස බාගන්න' : 'Download General 126 Personal Page as Separate PDF'}
               style={{
-                height: '32px',
-                padding: '0 12px',
+                minHeight: '32px',
+                height: 'auto',
+                padding: '5px 12px',
                 fontSize: '11px',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                lineHeight: '1.2',
+                boxSizing: 'border-box',
                 borderColor: '#60a5fa',
                 background: '#eff6ff',
                 color: '#1e40af',
@@ -3484,6 +3616,7 @@ function DetailModal({
               <FileDown size={14} />
               <span>{language === 'si' ? 'General 126 PDF' : 'General 126 PDF'}</span>
             </button>
+
             {hasOfficeUsePart && (
               <button
                 type="button"
@@ -3491,12 +3624,17 @@ function DetailModal({
                 onClick={() => onPrintOfficerAssessment ? onPrintOfficerAssessment(request) : printOfficeUseOnlyPdf(request)}
                 title={language === 'si' ? 'For Office Use Only (Particulars of Available Leave) පිටුව වෙනම PDF ලෙස බාගන්න' : 'Download For Office Use Only (Particulars of Available Leave) as Separate PDF'}
                 style={{
-                  height: '32px',
-                  padding: '0 12px',
+                  minHeight: '32px',
+                  height: 'auto',
+                  padding: '5px 12px',
                   fontSize: '11px',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  lineHeight: '1.2',
+                  boxSizing: 'border-box',
                   borderColor: '#93c5fd',
                   background: '#eff6ff',
                   color: '#1d4ed8',
@@ -3507,6 +3645,7 @@ function DetailModal({
                 <span>{language === 'si' ? 'Office Use (නිවාඩු විස්තර) PDF' : 'For Office Use Only PDF'}</span>
               </button>
             )}
+
             {hasDeptHeadPart && (
               <button
                 type="button"
@@ -3514,12 +3653,17 @@ function DetailModal({
                 onClick={() => printDepartmentHeadLetterPdf(request)}
                 title={language === 'si' ? 'දෙපාර්තමේන්තු ප්‍රධානියා පුරවනු ලබන ලිපිය වෙනම PDF ලෙස බාගන්න' : 'Download Head of Department Forwarding Letter as Separate PDF'}
                 style={{
-                  height: '32px',
-                  padding: '0 12px',
+                  minHeight: '32px',
+                  height: 'auto',
+                  padding: '5px 12px',
                   fontSize: '11px',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  lineHeight: '1.2',
+                  boxSizing: 'border-box',
                   borderColor: '#c084fc',
                   background: '#faf5ff',
                   color: '#7e22ce',
@@ -3530,6 +3674,7 @@ function DetailModal({
                 <span>{language === 'si' ? 'ආයතන ප්‍රධානී ලිපිය PDF' : 'Dept Head Letter PDF'}</span>
               </button>
             )}
+
             {hasSecretaryPart && (
               <button
                 type="button"
@@ -3537,12 +3682,17 @@ function DetailModal({
                 onClick={() => printSecretaryApprovalLetterPdf(request)}
                 title={language === 'si' ? 'අමාත්‍යාංශ ලේකම්ගේ නිවාඩු අනුමත ලිපිය (Leave is approved/not approved) PDF ලෙස බාගන්න' : 'Download Ministry Secretary Approval Letter (Leave is approved/not approved) as Separate PDF'}
                 style={{
-                  height: '32px',
-                  padding: '0 12px',
+                  minHeight: '32px',
+                  height: 'auto',
+                  padding: '5px 12px',
                   fontSize: '11px',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  lineHeight: '1.2',
+                  boxSizing: 'border-box',
                   borderColor: '#86efac',
                   background: '#f0fdf4',
                   color: '#15803d',
@@ -3553,6 +3703,7 @@ function DetailModal({
                 <span>{language === 'si' ? 'ලේකම්ගේ ලිපිය PDF' : 'Secretary Letter PDF'}</span>
               </button>
             )}
+
             {hasClearanceSheetPart && (
               <button
                 type="button"
@@ -3560,12 +3711,17 @@ function DetailModal({
                 onClick={() => printNoteSheetMinisterialPdf(request)}
                 title={language === 'si' ? 'අවසර පත්‍රිකාව සහ අමාත්‍ය ඉදිරිපත් කිරීම වෙනම PDF ලෙස බාගන්න' : 'Download Clearance Sheet & Ministerial Submission PDF'}
                 style={{
-                  height: '32px',
-                  padding: '0 12px',
+                  minHeight: '32px',
+                  height: 'auto',
+                  padding: '5px 12px',
                   fontSize: '11px',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  lineHeight: '1.2',
+                  boxSizing: 'border-box',
                   borderColor: '#38bdf8',
                   background: '#f0f9ff',
                   color: '#0369a1',
@@ -3576,84 +3732,6 @@ function DetailModal({
                 <span>{language === 'si' ? 'අවසර පත්‍රිකාව PDF' : 'Clearance Sheet PDF'}</span>
               </button>
             )}
-            {/* Edit / Resubmit Button */}
-            {canEdit && onEdit && (
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => onEdit(request)}
-                title={language === 'si' ? (request.status === 'Rejected' ? 'අඩුපාඩු සකසා නැවත ඉදිරිපත් කරන්න' : 'අයදුම්පත සංස්කරණය කරන්න') : (request.status === 'Rejected' ? 'Fix Deficiencies & Resubmit' : 'Edit Application')}
-                style={{
-                  height: '32px',
-                  padding: '0 12px',
-                  fontSize: '11px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  borderColor: request.status === 'Rejected' ? '#f87171' : '#93c5fd',
-                  background: request.status === 'Rejected' ? '#fef2f2' : '#eff6ff',
-                  color: request.status === 'Rejected' ? '#b91c1c' : '#1d4ed8',
-                  fontWeight: 700
-                }}
-              >
-                <Edit3 size={13} />
-                <span>{language === 'si' ? (request.status === 'Rejected' ? 'අඩුපාඩු සකසා නැවත ඉදිරිපත් කරන්න (Resubmit)' : 'සංස්කරණය (Edit)') : (request.status === 'Rejected' ? 'Fix & Resubmit' : 'Edit')}</span>
-              </button>
-            )}
-
-            {/* Delete Button */}
-            {canDelete && onDelete && (
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => onDelete(request)}
-                title={language === 'si' ? 'අයදුම්පත මකා දමන්න' : 'Delete Application'}
-                style={{
-                  height: '32px',
-                  padding: '0 12px',
-                  fontSize: '11px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  borderColor: '#fca5a5',
-                  background: '#fef2f2',
-                  color: '#dc2626',
-                  fontWeight: 600
-                }}
-              >
-                <Trash2 size={13} />
-                <span>{language === 'si' ? 'මකා දමන්න (Delete)' : 'Delete'}</span>
-              </button>
-            )}
-
-            {/* Reject Button */}
-            {canReject && onReject && (
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => onReject(request)}
-                title={language === 'si' ? 'අයදුම්පත ප්‍රතික්ෂේප කරන්න' : 'Reject Application'}
-                style={{
-                  height: '32px',
-                  padding: '0 12px',
-                  fontSize: '11px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  borderColor: '#fca5a5',
-                  background: '#fee2e2',
-                  color: '#b91c1c',
-                  fontWeight: 700
-                }}
-              >
-                <AlertCircle size={13} />
-                <span>{language === 'si' ? 'ප්‍රතික්ෂේප කරන්න (Reject)' : 'Reject'}</span>
-              </button>
-            )}
-
-            <button className="icon-button" onClick={onClose} aria-label={t.close}>
-              <X size={19} />
-            </button>
           </div>
         </header>
 

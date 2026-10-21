@@ -3187,12 +3187,17 @@ export function ApplicantLiveProcessTracker({
           onClick={() => downloadApplicationZip(activeReq, token)}
           title={language === 'si' ? `සම්පූර්ණ ලේඛන 7ම අඩංගු ZIP ගොනුව බාගන්න (FV-${String(activeReq.id).padStart(4, '0')}.zip)` : `Download Complete 7-Document ZIP Package (FV-${String(activeReq.id).padStart(4, '0')}.zip)`}
           style={{
-            height: '30px',
-            padding: '0 10px',
+            minHeight: '30px',
+            height: 'auto',
+            padding: '5px 10px',
             fontSize: '11px',
             display: 'inline-flex',
             alignItems: 'center',
             gap: '5px',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+            lineHeight: 1.2,
+            boxSizing: 'border-box',
             borderColor: '#3b82f6',
             background: '#eff6ff',
             color: '#1d4ed8',
@@ -3207,7 +3212,19 @@ export function ApplicantLiveProcessTracker({
           type="button"
           className="secondary-button"
           onClick={() => printGeneral126Pdf(activeReq)}
-          style={{ height: '30px', padding: '0 10px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+          style={{
+            minHeight: '30px',
+            height: 'auto',
+            padding: '5px 10px',
+            fontSize: '11px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+            lineHeight: 1.2,
+            boxSizing: 'border-box'
+          }}
         >
           <FileDown size={13} />
           <span>{language === 'si' ? 'General 126 PDF' : 'General 126 PDF'}</span>
@@ -3219,12 +3236,17 @@ export function ApplicantLiveProcessTracker({
             className="secondary-button"
             onClick={() => printAppendix16Pdf(activeReq)}
             style={{
-              height: '30px',
-              padding: '0 10px',
+              minHeight: '30px',
+              height: 'auto',
+              padding: '5px 10px',
               fontSize: '11px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '5px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              lineHeight: 1.2,
+              boxSizing: 'border-box',
               color: '#15803d',
               borderColor: '#86efac',
               background: '#f0fdf4'
@@ -3240,7 +3262,19 @@ export function ApplicantLiveProcessTracker({
             type="button"
             className="secondary-button"
             onClick={() => printDepartmentHeadLetterPdf(activeReq)}
-            style={{ height: '30px', padding: '0 10px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+            style={{
+              minHeight: '30px',
+              height: 'auto',
+              padding: '5px 10px',
+              fontSize: '11px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              lineHeight: 1.2,
+              boxSizing: 'border-box'
+            }}
           >
             <FileDown size={13} />
             <span>{language === 'si' ? 'දෙපාර්තමේන්තු ප්‍රධානී ලිපිය PDF' : 'Dept Head Letter PDF'}</span>
@@ -3252,7 +3286,19 @@ export function ApplicantLiveProcessTracker({
             type="button"
             className="secondary-button"
             onClick={() => printOfficeUseOnlyPdf(activeReq)}
-            style={{ height: '30px', padding: '0 10px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+            style={{
+              minHeight: '30px',
+              height: 'auto',
+              padding: '5px 10px',
+              fontSize: '11px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              lineHeight: 1.2,
+              boxSizing: 'border-box'
+            }}
           >
             <FileDown size={13} />
             <span>{language === 'si' ? 'නිවාඩු විස්තර (Office Use) PDF' : 'Leave Particulars PDF'}</span>
@@ -3265,12 +3311,17 @@ export function ApplicantLiveProcessTracker({
             className="secondary-button"
             onClick={() => printSecretaryApprovalLetterPdf(activeReq)}
             style={{
-              height: '30px',
-              padding: '0 10px',
+              minHeight: '30px',
+              height: 'auto',
+              padding: '5px 10px',
               fontSize: '11px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '5px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              lineHeight: 1.2,
+              boxSizing: 'border-box',
               borderColor: '#86efac',
               background: '#f0fdf4',
               color: '#15803d',
@@ -3290,12 +3341,17 @@ export function ApplicantLiveProcessTracker({
             onClick={() => onEditRequest(activeReq)}
             title={language === 'si' ? (activeReq.status === 'Rejected' ? 'අඩුපාඩු සකසා නැවත ඉදිරිපත් කරන්න' : 'අයදුම්පත සංස්කරණය කරන්න') : (activeReq.status === 'Rejected' ? 'Fix Deficiencies & Resubmit' : 'Edit Application')}
             style={{
-              height: '30px',
-              padding: '0 10px',
+              minHeight: '30px',
+              height: 'auto',
+              padding: '5px 10px',
               fontSize: '11px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '5px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              lineHeight: 1.2,
+              boxSizing: 'border-box',
               borderColor: activeReq.status === 'Rejected' ? '#f87171' : '#93c5fd',
               background: activeReq.status === 'Rejected' ? '#fef2f2' : '#eff6ff',
               color: activeReq.status === 'Rejected' ? '#b91c1c' : '#1d4ed8',
@@ -3313,13 +3369,19 @@ export function ApplicantLiveProcessTracker({
             type="button"
             className="secondary-button"
             onClick={() => onDeleteRequest(activeReq)}
+            title={language === 'si' ? 'අයදුම්පත මකා දමන්න' : 'Delete Application'}
             style={{
-              height: '30px',
-              padding: '0 10px',
+              minHeight: '30px',
+              height: 'auto',
+              padding: '5px 10px',
               fontSize: '11px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '5px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              lineHeight: 1.2,
+              boxSizing: 'border-box',
               borderColor: '#fca5a5',
               background: '#fef2f2',
               color: '#dc2626',
@@ -3338,12 +3400,17 @@ export function ApplicantLiveProcessTracker({
             className="secondary-button"
             onClick={() => onRejectRequest(activeReq)}
             style={{
-              height: '30px',
-              padding: '0 10px',
+              minHeight: '30px',
+              height: 'auto',
+              padding: '5px 10px',
               fontSize: '11px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '5px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              lineHeight: 1.2,
+              boxSizing: 'border-box',
               borderColor: '#fca5a5',
               background: '#fee2e2',
               color: '#b91c1c',
@@ -3360,7 +3427,19 @@ export function ApplicantLiveProcessTracker({
             type="button"
             className="secondary-button"
             onClick={() => onOpenDetail(activeReq)}
-            style={{ height: '30px', padding: '0 10px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+            style={{
+              minHeight: '30px',
+              height: 'auto',
+              padding: '5px 10px',
+              fontSize: '11px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              lineHeight: 1.2,
+              boxSizing: 'border-box'
+            }}
           >
             <Eye size={13} />
             <span>{language === 'si' ? 'විස්තර බලන්න' : 'View Details'}</span>
